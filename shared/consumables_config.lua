@@ -1,4 +1,9 @@
 Config.Consumables = {
+    -- Verfuegbare Inventar-Modi:
+    -- 'framework'        = ESX-/QBCore-Standard-Inventar
+    -- 'ox_inventory'     = ox_inventory (Items brauchen den Client-Export, siehe install/consumables/ox_items.lua)
+    -- 'hex_4_inventory'  = HEX v4 Inventar
+    -- 'jaksam_inventory' = jaksam Inventar
     Inventory = 'framework',
     Progress = 'fc_hud',
     RemoveItem = true,
