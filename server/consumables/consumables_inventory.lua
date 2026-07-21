@@ -81,6 +81,27 @@ local function oxRemove(source, itemName)
     return ok and removed == true
 end
 
+local function jaksamGetCount(source, itemName)
+    local ok, count = pcall(function()
+        return exports['jaksam_inventory']:getTotalItemAmount(source, itemName)
+    end)
+    if not ok or type(count) ~= 'number' then return 0 end
+    return count
+end
+
+local function jaksamRemove(source, itemName)
+    local ok, removed = pcall(function()
+        return exports['jaksam_inventory']:removeItem(source, itemName, 1)
+    end)
+    return ok and removed == true
+end
+
+local function jaksamRegisterUsable(itemName, callback)
+    return pcall(function()
+        exports['jaksam_inventory']:registerUsableItem(itemName, callback)
+    end)
+end
+
 function ConsumablesInventory.New()
     local inventoryType = Config.Consumables.Inventory
     local esx, qbcore = resolveCoreObjects()
@@ -94,6 +115,9 @@ function ConsumablesInventory.New()
         if inventoryType == 'hex_4_inventory' then
             return hexGetCount(esx, qbcore, source, itemName)
         end
+        if inventoryType == 'jaksam_inventory' then
+            return jaksamGetCount(source, itemName)
+        end
         return Framework.GetItemCount(source, itemName)
     end
 
@@ -104,12 +128,20 @@ function ConsumablesInventory.New()
         if inventoryType == 'hex_4_inventory' then
             return hexRemove(esx, qbcore, source, itemName)
         end
+        if inventoryType == 'jaksam_inventory' then
+            return jaksamRemove(source, itemName)
+        end
         return Framework.RemoveItem(source, itemName, 1) == true
     end
 
     function adapter.RegisterUsable(itemName, callback)
         if inventoryType == 'ox_inventory' then return false end
         if registered[itemName] then return false end
+        if inventoryType == 'jaksam_inventory' then
+            if not jaksamRegisterUsable(itemName, callback) then return false end
+            registered[itemName] = true
+            return true
+        end
         if esx then
             esx.RegisterUsableItem(itemName, callback)
         elseif qbcore then

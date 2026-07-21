@@ -6,6 +6,25 @@ Alle relevanten Änderungen an FarmingCreator-X-Hex. Bei jedem Update sind die D
 
 ---
 
+## [1.2.0] – 2026-07-20
+
+### Hinzugefügt
+
+- **jaksam_inventory als vollwertiger Inventar-Modus** (`Config.Consumables.Inventory = 'jaksam_inventory'`): Benutzung über jaksams `registerUsableItem`, Besitzprüfung und Entfernung über die jaksam-Exports (`getTotalItemAmount`, `removeItem`).
+
+### Zu ersetzende Dateien
+
+| Datei | Grund |
+| --- | --- |
+| `server/consumables/consumables_inventory.lua` | neuer jaksam_inventory-Modus |
+| `fxmanifest.lua` | Versions-Bump |
+| `README.md` | Doku-Update (optional) |
+| `CHANGELOG.md` | Changelog-Eintrag (optional) |
+
+Kein SQL-Import nötig.
+
+---
+
 ## [1.1.0] – 2026-07-20
 
 ### Hinzugefügt

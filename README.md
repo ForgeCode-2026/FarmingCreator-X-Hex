@@ -62,7 +62,7 @@ Sammeln → Verarbeiten → Verkaufen → Konsumieren – komplett ohne Code, di
 | [oxmysql](https://github.com/CommunityOx/oxmysql) | ✅ | Datenbank |
 | `hex_menu_api` | ✅ | Menü-System (Creator & Eingaben) |
 | ESX **oder** QBCore | ✅ | Framework |
-| `ox_inventory` / `hex_4_inventory` | optional | nur bei entsprechendem Inventar-Modus |
+| `ox_inventory` / `hex_4_inventory` / `jaksam_inventory` | optional | nur bei entsprechendem Inventar-Modus |
 
 ---
 
@@ -105,7 +105,7 @@ ensure hex_menu_api
 ensure FarmingCreator
 ```
 
-Optionale Inventar-Resourcen (`ox_inventory`, `hex_4_inventory`) ebenfalls **vor** FarmingCreator starten, wenn sie in der Config ausgewählt sind. Sie sind bewusst **keine** harten Manifest-Dependencies, damit beide Framework-Modi ohne sie lauffähig bleiben.
+Optionale Inventar-Resourcen (`ox_inventory`, `hex_4_inventory`, `jaksam_inventory`) ebenfalls **vor** FarmingCreator starten, wenn sie in der Config ausgewählt sind. Sie sind bewusst **keine** harten Manifest-Dependencies, damit beide Framework-Modi ohne sie lauffähig bleiben.
 
 ### Schritt 6 – Server starten ✅
 
@@ -150,6 +150,7 @@ Neue Items starten im Creator aus einer fertigen Vorlage (Zigarette, Joint, Tabl
 | `'framework'` | ESX `RegisterUsableItem` bzw. QBCore `CreateUseableItem`; Item-Entfernung über das Framework |
 | `'ox_inventory'` | Benutzung startet über den Client-Export in den ox-Item-Definitionen; Zählen/Entfernen über ox-Exports |
 | `'hex_4_inventory'` | Benutzung über die Framework-Bridge; Zählen/Entfernen über die nativen HEX-Exports (`GetInventory`, `RemoveItemFromInventory`) |
+| `'jaksam_inventory'` | Benutzung über jaksams `registerUsableItem`; Zählen/Entfernen über die jaksam-Exports (`getTotalItemAmount`, `removeItem`) |
 
 Für `ox_inventory` muss jedes Item so definiert sein (siehe `install/consumables/ox_items.lua`):
 
