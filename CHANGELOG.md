@@ -6,6 +6,24 @@ Alle relevanten Änderungen an FarmingCreator-X-Hex. Bei jedem Update sind die D
 
 ---
 
+## [1.3.0] – 2026-07-21
+
+### Hinzugefügt
+
+- **Automatischer Versions-Check beim Serverstart**: Das Script vergleicht die installierte Version mit der neuesten Version auf GitHub. Ist die Installation veraltet, werden in der Server-Konsole die neue Versionsnummer, der Download-Link und alle Changelog-Einträge seit der installierten Version ausgegeben. Ist alles aktuell, erscheint eine kurze grüne Bestätigung.
+
+### Zu ersetzende Dateien
+
+| Datei | Grund |
+| --- | --- |
+| `server/version_check.lua` | neue Datei |
+| `fxmanifest.lua` | neuer Script-Eintrag + Versions-Bump |
+| `CHANGELOG.md` | Changelog-Eintrag (optional) |
+
+Kein SQL-Import nötig.
+
+---
+
 ## [1.2.0] – 2026-07-20
 
 ### Hinzugefügt
