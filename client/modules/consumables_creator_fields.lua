@@ -104,6 +104,10 @@ function ConsumablesCreatorFields.InputText(title, maxLength, regex)
     return KeyboardInput(title, maxLength, regex)
 end
 
+function ConsumablesCreatorFields.SelectOption(menuId, title, options)
+    return SelectFromList(menuId, title, options)
+end
+
 local NUMBER_REGEX = '^-?[0-9]*[.,]?[0-9]*$'
 
 local function ParseNumber(raw)

@@ -131,6 +131,162 @@ Config.HallucinationPresets = {
     }
 }
 
+local function FirstAnimationPresetName()
+    local names = {}
+    for name in pairs(Config.AnimationPresets) do
+        names[#names + 1] = name
+    end
+    table.sort(names)
+    return names[1]
+end
+
+Config.ItemTemplates = {
+    zigarette = {
+        label = 'Zigarette',
+        cooldown = 1500,
+        consume = {
+            duration = 6000,
+            text = 'Du rauchst eine Zigarette ...',
+            allowInVehicle = false,
+            animation = 'rauchen'
+        },
+        effects = {
+            duration = 15000,
+            health = 2
+        }
+    },
+
+    joint = {
+        label = 'Joint',
+        cooldown = 2500,
+        consume = {
+            duration = 7000,
+            text = 'Du rauchst einen Joint ...',
+            allowInVehicle = false,
+            animation = 'joint'
+        },
+        effects = {
+            duration = 90000,
+            health = 5,
+            hallucination = {
+                timecycle = 'spectator5',
+                strength = 0.3,
+                cameraShake = 0.1,
+                motionBlur = true
+            }
+        }
+    },
+
+    pille = {
+        label = 'Tablette/Medikament',
+        cooldown = 2500,
+        consume = {
+            duration = 3500,
+            text = 'Du nimmst eine Tablette ...',
+            allowInVehicle = true,
+            animation = 'pille'
+        },
+        effects = {
+            duration = 0,
+            health = 25
+        }
+    },
+
+    kokain = {
+        label = 'Kokain',
+        cooldown = 5000,
+        consume = {
+            duration = 5500,
+            text = 'Du konsumierst Kokain ...',
+            allowInVehicle = false,
+            animation = 'kokain'
+        },
+        effects = {
+            duration = 75000,
+            speed = 1.28,
+            stamina = true,
+            hallucination = {
+                timecycle = 'spectator5',
+                strength = 0.55,
+                pulsing = true,
+                cameraShake = 0.2,
+                motionBlur = true
+            }
+        }
+    },
+
+    meth = {
+        label = 'Meth',
+        cooldown = 5000,
+        consume = {
+            duration = 7000,
+            text = 'Du rauchst Meth ...',
+            allowInVehicle = false,
+            animation = 'meth'
+        },
+        effects = {
+            duration = 100000,
+            armor = 25,
+            speed = 1.38,
+            stamina = true,
+            hallucination = {
+                timecycle = 'drug_drive_blend01',
+                strength = 0.75,
+                pulsing = true,
+                screenEffect = 'DrugsMichaelAliensFight',
+                cameraShake = 0.45,
+                motionBlur = true,
+                movementClipset = 'move_m@drunk@moderatedrunk',
+                ragdollChance = 4
+            }
+        }
+    },
+
+    essen = {
+        label = 'Essen',
+        cooldown = 1500,
+        consume = {
+            duration = 5000,
+            text = 'Du isst etwas ...',
+            allowInVehicle = false,
+            animation = 'essen'
+        },
+        effects = {
+            duration = 0,
+            health = 15
+        }
+    },
+
+    trinken = {
+        label = 'Trinken',
+        cooldown = 1500,
+        consume = {
+            duration = 4000,
+            text = 'Du trinkst etwas ...',
+            allowInVehicle = true,
+            animation = 'trinken'
+        },
+        effects = {
+            duration = 0,
+            stamina = true
+        }
+    },
+
+    leer = {
+        label = 'Leer (Standard)',
+        cooldown = Config.Consumables.DefaultCooldownMs,
+        consume = {
+            duration = 3000,
+            text = 'Du benutzt ein Item ...',
+            allowInVehicle = false,
+            animation = FirstAnimationPresetName()
+        },
+        effects = {
+            duration = 0
+        }
+    }
+}
+
 Config.Items = {
     cigarette = {
         label = 'Zigarette',

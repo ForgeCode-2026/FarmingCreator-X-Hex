@@ -231,40 +231,71 @@ OpenDraftMenu = function(itemName, draft, isNew)
     end, function() end)
 end
 
-local function BuildDefaultDraft()
-    local presetNames = ConsumablesCreatorFields.SortedPresetNames()
-    return {
-        label = LocaleOr('consumables_default_label', 'Neues Consumable'),
-        cooldown = Config.Consumables.DefaultCooldownMs,
-        consume = {
-            duration = 3000,
-            text = LocaleOr('consumables_default_text', 'Du benutzt ein Item ...'),
-            allowInVehicle = false,
-            animation = presetNames[1],
-        },
-        effects = { duration = 0 },
-    }
+local function SortedTemplateOptions()
+    local options = {}
+    for key, template in pairs(Config.ItemTemplates or {}) do
+        options[#options + 1] = { label = Escape(template.label or key), value = key }
+    end
+    table.sort(options, function(a, b) return a.label < b.label end)
+    return options
+end
+
+local function PromptTemplate()
+    return ConsumablesCreatorFields.SelectOption('rageui_consumables_template',
+        LocaleOr('consumables_template_select', 'Vorlage waehlen'), SortedTemplateOptions())
+end
+
+local function PromptItemName()
+    local rawName = ConsumablesCreatorFields.InputText(
+        LocaleOr('consumables_field_item_name', 'Item-Name (a-z, 0-9, _ und -)'), 50, '^[a-z0-9_-]+$')
+    if not rawName or rawName == '' then return nil end
+    local itemName = ConsumablesSchema.NormalizeItemName(rawName)
+    if not itemName then
+        Notify(LocaleOr('consumables_invalid_item_name', 'Ungueltiger Item-Name.'), 'error')
+        return nil
+    end
+    if Config.Items[itemName] then
+        Notify(LocaleOr('consumables_duplicate_item', 'Dieses Item existiert bereits.'), 'error')
+        return nil
+    end
+    return itemName
+end
+
+local function DeriveLabel(itemName)
+    local label = itemName:gsub('[_%-]', ' ')
+    return label:sub(1, 1):upper() .. label:sub(2)
+end
+
+local function PromptLabel(itemName)
+    local label = ConsumablesCreatorFields.InputText(
+        LocaleOr('consumables_field_label_optional', 'Anzeigename (leer = automatisch aus dem Namen)'), 64, nil)
+    if label == nil then return nil end
+    if label == '' then return DeriveLabel(itemName) end
+    return label
+end
+
+local function BuildTemplateDraft(templateKey, label)
+    local draft = ConsumablesSchema.Copy(Config.ItemTemplates[templateKey])
+    draft.label = label
+    local normalized = ConsumablesSchema.NormalizeDefinition(draft, Config.AnimationPresets)
+    return normalized or draft
 end
 
 local function StartCreateFlow()
     local sessionGen = ConsumablesCreatorFields.CurrentGeneration()
     exports['hex_menu_api']:rageCloseAll()
-    local rawName = ConsumablesCreatorFields.InputText(
-        LocaleOr('consumables_field_item_name', 'Item-Name (a-z, 0-9, _ und -)'), 50, '^[a-z0-9_-]+$')
+    local templateKey = PromptTemplate()
     if IsStale(sessionGen) then return end
-    if not rawName or rawName == '' then
+    if not templateKey or not Config.ItemTemplates[templateKey] then
         return OpenItemListMenu()
     end
-    local itemName = ConsumablesSchema.NormalizeItemName(rawName)
-    if not itemName then
-        Notify(LocaleOr('consumables_invalid_item_name', 'Ungueltiger Item-Name.'), 'error')
-        return OpenItemListMenu()
-    end
-    if Config.Items[itemName] then
-        Notify(LocaleOr('consumables_duplicate_item', 'Dieses Item existiert bereits.'), 'error')
-        return OpenItemListMenu()
-    end
-    OpenDraftMenu(itemName, BuildDefaultDraft(), true)
+    local itemName = PromptItemName()
+    if IsStale(sessionGen) then return end
+    if not itemName then return OpenItemListMenu() end
+    local label = PromptLabel(itemName)
+    if IsStale(sessionGen) then return end
+    if not label then return OpenItemListMenu() end
+    OpenDraftMenu(itemName, BuildTemplateDraft(templateKey, label), true)
 end
 
 local function OpenExistingItem(itemName)

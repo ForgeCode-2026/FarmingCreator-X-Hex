@@ -125,6 +125,7 @@ Locales['de'] = {
 
     consumables_menu_title = 'Consumables Creator',
     consumables_new_item = '[+] Neues Consumable',
+    consumables_template_select = 'Vorlage wählen',
     consumables_default_label = 'Neues Consumable',
     consumables_default_text = 'Du benutzt ein Item ...',
     consumables_section_basics = 'Basisdaten',
@@ -150,6 +151,7 @@ Locales['de'] = {
 
     consumables_field_item_name = 'Item-Name (a-z, 0-9, _ und -)',
     consumables_field_label = 'Anzeigename (max. 64 Zeichen)',
+    consumables_field_label_optional = 'Anzeigename (leer = automatisch aus dem Namen)',
     consumables_field_cooldown = 'Cooldown in Sekunden (0-3600)',
     consumables_field_duration = 'Konsumdauer in Sekunden (0-120)',
     consumables_field_text = 'Fortschrittstext (max. 160 Zeichen)',

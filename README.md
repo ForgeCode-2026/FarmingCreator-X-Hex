@@ -40,7 +40,7 @@ Sammeln → Verarbeiten → Verkaufen → Konsumieren – komplett ohne Code, di
 
 ### Consumables
 
-- **Consumables-Creator** – Drogen, Medikamente, Essen & Trinken komplett ingame erstellen: Label, Cooldown, Konsumdauer (bequem in Sekunden), Animation & Prop – gespeichert in MySQL, sofort benutzbar, ganz ohne Neustart.
+- **Consumables-Creator** – Drogen, Medikamente, Essen & Trinken komplett ingame erstellen: Neue Items starten aus fertigen Vorlagen (Zigarette, Joint, Tablette, Kokain, Meth, Essen, Trinken oder Leer) und sind sofort speicherbar; Label, Cooldown, Konsumdauer (bequem in Sekunden), Animation & Prop lassen sich danach feinjustieren – gespeichert in MySQL, sofort benutzbar, ganz ohne Neustart.
 - **Effekte & Rausch-Presets** – Leben, Rüstung, Tempo-Boost, Ausdauer sowie vier vorgefertigte Halluzinations-Stufen (vom leichten Rausch bis zum vollen LSD-Trip) mit Screen-Effekten, Kamerawackeln, Torkel-Gang und Umfall-Chance.
 - **Animations-Presets & Props** – 8 fertige Konsum-Animationen (Rauchen, Trinken, Pillen, Spritze u. v. m.) inklusive Props in der Hand; eigene Scenarios/Animationen ebenfalls möglich.
 - **Inventar-Support** – ESX-/QBCore-Standard-Inventar, ox_inventory (Client-Export) und HEX v4; 7 fertige Beispiel-Items mit Install-Dateien liegen bei.
@@ -133,6 +133,8 @@ Normale Spieler ohne Berechtigung werden mit einer Fehlermeldung abgewiesen; auc
 ---
 
 ## 💊 Consumables
+
+Neue Items starten im Creator aus einer fertigen Vorlage (Zigarette, Joint, Tablette, Kokain, Meth, Essen, Trinken oder Leer, definiert in `Config.ItemTemplates`) und sind direkt nach Name und Anzeigename mit „Speichern" fertig – alle Abschnitte bleiben zum Feintuning verfügbar.
 
 ### MySQL-Erstbefüllung (Seed)
 
