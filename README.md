@@ -23,6 +23,7 @@ Sammeln → Verarbeiten → Verkaufen → Konsumieren – komplett ohne Code, di
 - [Exports & Events](#-exports--events)
 - [Test-Checkliste](#-test-checkliste)
 - [Wichtige Hinweise](#%EF%B8%8F-wichtige-hinweise)
+- [Changelog](CHANGELOG.md)
 
 ---
 
