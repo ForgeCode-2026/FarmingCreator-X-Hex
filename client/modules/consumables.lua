@@ -275,15 +275,11 @@ local function RunConsumeLoop(duration)
 end
 
 local function StartProgress(text, duration)
-    if Config.Consumables.Progress == 'fc_hud' then
-        TriggerEvent('fc_hud:progress', text, duration)
-    end
+    Framework.StartProgress(text, duration)
 end
 
 local function StopProgress()
-    if Config.Consumables.Progress == 'fc_hud' then
-        TriggerEvent('fc_hud:progress', '', 0)
-    end
+    Framework.StopProgress()
 end
 
 local function RejectStart(token, message)

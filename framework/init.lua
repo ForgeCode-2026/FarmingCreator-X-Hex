@@ -173,6 +173,22 @@ if IsDuplicityVersion() then
         end)
     end
 else
+    Framework = {}
+
+    function Framework.StartProgress(text, duration)
+        if Config.Consumables.Progress == 'fc_hud' then
+            --TriggerEvent('fc_hud:progress', text, duration)
+            exports.a_hud:StartProgressBar(text, duration)
+        end
+    end
+
+    function Framework.StopProgress()
+        if Config.Consumables.Progress == 'fc_hud' then
+            --TriggerEvent('fc_hud:progress', '', 0)
+            exports.a_hud:StopProgressBar()
+        end
+    end
+
     local currentHelpNotify = nil
 
     CreateThread(function()
