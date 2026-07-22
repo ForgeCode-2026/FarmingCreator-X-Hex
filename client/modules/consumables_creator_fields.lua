@@ -175,12 +175,12 @@ local function SelectBoolean(title)
     return choice == 'yes'
 end
 
-local function BeginSection(draft)
+local function BeginEdit(draft)
     exports['hex_menu_api']:rageCloseAll()
     return ConsumablesSchema.Copy(draft)
 end
 
-local function FinishSection(copy)
+local function FinishEdit(copy)
     local normalized, errorCode = ConsumablesSchema.NormalizeDefinition(copy, Config.AnimationPresets)
     if not normalized then
         Notify(LocaleOr('consumables_invalid_section', 'Ungueltige Eingabe (%s).', tostring(errorCode)), 'error')
@@ -189,29 +189,42 @@ local function FinishSection(copy)
     return normalized
 end
 
-function ConsumablesCreatorFields.EditBasics(draft)
-    local copy = BeginSection(draft)
+function ConsumablesCreatorFields.EditLabel(draft)
+    local copy = BeginEdit(draft)
     local label = KeyboardInput(LocaleOr('consumables_field_label', 'Anzeigename (max. 64 Zeichen)'), 64, nil)
     if not label or label == '' then return nil end
     copy.label = label
+    return FinishEdit(copy)
+end
+
+function ConsumablesCreatorFields.EditCooldown(draft)
+    local copy = BeginEdit(draft)
     local cooldown, ok = InputRequiredSeconds(LocaleOr('consumables_field_cooldown', 'Cooldown in Sekunden (0-3600)'), 3600)
     if not ok then return nil end
     copy.cooldown = cooldown
-    return FinishSection(copy)
+    return FinishEdit(copy)
 end
 
-function ConsumablesCreatorFields.EditConsume(draft)
-    local copy = BeginSection(draft)
+function ConsumablesCreatorFields.EditConsumeDuration(draft)
+    local copy = BeginEdit(draft)
     local duration, ok = InputRequiredSeconds(LocaleOr('consumables_field_duration', 'Konsumdauer in Sekunden (0-120)'), 120)
     if not ok then return nil end
     copy.consume.duration = duration
+    return FinishEdit(copy)
+end
+
+function ConsumablesCreatorFields.EditConsumeText(draft)
+    local copy = BeginEdit(draft)
     local text = KeyboardInput(LocaleOr('consumables_field_text', 'Fortschrittstext (max. 160 Zeichen)'), 160, nil)
     if not text or text == '' then return nil end
     copy.consume.text = text
-    local allowInVehicle = SelectBoolean(LocaleOr('consumables_field_allow_in_vehicle', 'Im Fahrzeug benutzbar?'))
-    if allowInVehicle == nil then return nil end
-    copy.consume.allowInVehicle = allowInVehicle
-    return FinishSection(copy)
+    return FinishEdit(copy)
+end
+
+function ConsumablesCreatorFields.ToggleVehicle(draft)
+    local copy = ConsumablesSchema.Copy(draft)
+    copy.consume.allowInVehicle = not copy.consume.allowInVehicle
+    return FinishEdit(copy)
 end
 
 local function PromptAnimationMode()
@@ -287,7 +300,7 @@ local function ApplyOptionalProp(consume)
 end
 
 function ConsumablesCreatorFields.EditAnimation(draft)
-    local copy = BeginSection(draft)
+    local copy = BeginEdit(draft)
     local mode = PromptAnimationMode()
     if not mode then return nil end
     local presetName = mode:match('^preset:(.+)$')
@@ -305,36 +318,58 @@ function ConsumablesCreatorFields.EditAnimation(draft)
         copy.consume.animation = animation
         if not ApplyOptionalProp(copy.consume) then return nil end
     end
-    return FinishSection(copy)
+    return FinishEdit(copy)
 end
 
-function ConsumablesCreatorFields.EditEffects(draft)
-    local copy = BeginSection(draft)
-    local effects = copy.effects or {}
-    local duration, durationOk = InputOptionalSeconds(
-        LocaleOr('consumables_field_effect_duration', 'Effektdauer in Sekunden (0-3600, leer = kein Effekt)'), 3600)
-    if not durationOk then return nil end
-    effects.duration = duration
-    local fields = {
-        { key = 'health', prompt = LocaleOr('consumables_field_health', 'Leben +0-200 (leer = kein Effekt)'), integer = true, max = 3 },
-        { key = 'armor', prompt = LocaleOr('consumables_field_armor', 'Ruestung +0-100 (leer = kein Effekt)'), integer = true, max = 3 },
-        { key = 'speed', prompt = LocaleOr('consumables_field_speed', 'Tempo 1.0-1.49 (leer = kein Effekt)'), max = 4 },
-    }
-    for _, field in ipairs(fields) do
-        local value, ok
-        if field.integer then
-            value, ok = InputOptionalInteger(field.prompt, field.max)
-        else
-            value, ok = InputOptionalNumber(field.prompt, field.max)
-        end
-        if not ok then return nil end
-        effects[field.key] = value
+function ConsumablesCreatorFields.EditEffectDuration(draft)
+    local copy = BeginEdit(draft)
+    local duration, ok = InputOptionalSeconds(
+        LocaleOr('consumables_field_effect_duration', 'Effektdauer in Sekunden (0-3600, 0 = nur Sofort-Effekte)'), 3600)
+    if not ok then return nil end
+    copy.effects = copy.effects or {}
+    copy.effects.duration = duration or 0
+    return FinishEdit(copy)
+end
+
+function ConsumablesCreatorFields.EditHealth(draft)
+    local copy = BeginEdit(draft)
+    local value, ok = InputOptionalInteger(LocaleOr('consumables_field_health', 'Leben 0-200 (0 oder leer = kein Effekt)'), 3)
+    if not ok then return nil end
+    if value == 0 then value = nil end
+    copy.effects = copy.effects or {}
+    copy.effects.health = value
+    return FinishEdit(copy)
+end
+
+function ConsumablesCreatorFields.EditArmor(draft)
+    local copy = BeginEdit(draft)
+    local value, ok = InputOptionalInteger(LocaleOr('consumables_field_armor', 'Ruestung 0-100 (0 oder leer = kein Effekt)'), 3)
+    if not ok then return nil end
+    if value == 0 then value = nil end
+    copy.effects = copy.effects or {}
+    copy.effects.armor = value
+    return FinishEdit(copy)
+end
+
+function ConsumablesCreatorFields.EditSpeed(draft)
+    local copy = BeginEdit(draft)
+    local value, ok = InputOptionalNumber(LocaleOr('consumables_field_speed', 'Tempo 1.0-1.49 (leer oder 1.0 = aus)'), 4)
+    if not ok then return nil end
+    if value == 1.0 then value = nil end
+    copy.effects = copy.effects or {}
+    copy.effects.speed = value
+    return FinishEdit(copy)
+end
+
+function ConsumablesCreatorFields.ToggleStamina(draft)
+    local copy = ConsumablesSchema.Copy(draft)
+    copy.effects = copy.effects or {}
+    if copy.effects.stamina then
+        copy.effects.stamina = nil
+    else
+        copy.effects.stamina = true
     end
-    local stamina = SelectBoolean(LocaleOr('consumables_field_stamina', 'Ausdauer auffuellen?'))
-    if stamina == nil then return nil end
-    effects.stamina = stamina or nil
-    copy.effects = effects
-    return FinishSection(copy)
+    return FinishEdit(copy)
 end
 
 local HALLUCINATION_KEYS = {
@@ -375,7 +410,7 @@ function ConsumablesCreatorFields.MatchHallucinationPreset(hallucination)
 end
 
 function ConsumablesCreatorFields.EditHallucination(draft)
-    local copy = BeginSection(draft)
+    local copy = BeginEdit(draft)
     local options = {
         { label = LocaleOr('consumables_hallucination_off', 'Aus'), value = 'off' },
     }
@@ -392,5 +427,5 @@ function ConsumablesCreatorFields.EditHallucination(draft)
     else
         copy.effects.hallucination = nil
     end
-    return FinishSection(copy)
+    return FinishEdit(copy)
 end

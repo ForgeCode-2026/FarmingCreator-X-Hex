@@ -4,7 +4,7 @@ lua54 'yes'
 
 author 'Forge-Code.xyz'
 description 'FarmingCreator mit Hex Menu Api'
-version '1.3.0'
+version '1.4.0'
 
 shared_scripts {
     'shared/config.lua',

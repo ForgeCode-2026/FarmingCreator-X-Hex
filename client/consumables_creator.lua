@@ -11,11 +11,18 @@ local MUTATION_EVENTS = {
     delete = 'forge_farming:consumables:creator:delete',
 }
 
-local SECTION_EDITORS = {
-    basics = 'EditBasics',
-    consume = 'EditConsume',
+local FIELD_EDITORS = {
+    label = 'EditLabel',
+    cooldown = 'EditCooldown',
+    consume_duration = 'EditConsumeDuration',
+    consume_text = 'EditConsumeText',
+    vehicle = 'ToggleVehicle',
     animation = 'EditAnimation',
-    effects = 'EditEffects',
+    effect_duration = 'EditEffectDuration',
+    health = 'EditHealth',
+    armor = 'EditArmor',
+    speed = 'EditSpeed',
+    stamina = 'ToggleStamina',
     hallucination = 'EditHallucination',
 }
 
@@ -82,7 +89,7 @@ end)
 local function DescribeAnimation(consume)
     local animation = consume.animation
     if type(animation) == 'string' then
-        return LocaleOr('consumables_animation_preset', 'Preset: %s', Escape(animation))
+        return Escape(animation)
     end
     if type(animation) == 'table' and animation.scenario then
         return LocaleOr('consumables_describe_scenario', 'Szenario: %s', Escape(animation.scenario))
@@ -98,15 +105,14 @@ local function FormatSeconds(ms)
     return ConsumablesCreatorFields.FormatSeconds(ms)
 end
 
-local function DescribeEffects(effects)
-    local parts = {}
-    if (effects.duration or 0) > 0 then parts[#parts + 1] = LocaleOr('consumables_describe_effect_duration', 'Dauer %s s', FormatSeconds(effects.duration)) end
-    if effects.health then parts[#parts + 1] = LocaleOr('consumables_describe_health', '+%d Leben', effects.health) end
-    if effects.armor then parts[#parts + 1] = LocaleOr('consumables_describe_armor', '+%d Ruestung', effects.armor) end
-    if effects.speed then parts[#parts + 1] = LocaleOr('consumables_describe_speed', 'Tempo %.2f', effects.speed) end
-    if effects.stamina then parts[#parts + 1] = LocaleOr('consumables_describe_stamina', 'Ausdauer') end
-    if #parts == 0 then return LocaleOr('consumables_none', 'Keine') end
-    return table.concat(parts, ' | ')
+local function BoolText(value)
+    if value then return LocaleOr('yes', 'Ja') end
+    return LocaleOr('no', 'Nein')
+end
+
+local function DescribeSpeed(speed)
+    if not speed then return LocaleOr('consumables_inactive', 'Aus') end
+    return string.format('%.2f', speed)
 end
 
 local function DescribeHallucination(effects)
@@ -120,16 +126,19 @@ end
 local function BuildDraftElements(draft, isNew)
     local consume = draft.consume
     local effects = draft.effects or {}
-    local vehicleText = consume.allowInVehicle and LocaleOr('yes', 'Ja') or LocaleOr('no', 'Nein')
     local elements = {
-        { title = LocaleOr('consumables_section_basics', 'Basisdaten'), value = 'basics', type = 'button',
-            description = LocaleOr('consumables_desc_basics', 'Label: %s | Cooldown: %s s', Escape(draft.label), FormatSeconds(draft.cooldown)) },
-        { title = LocaleOr('consumables_section_consume', 'Konsum'), value = 'consume', type = 'button',
-            description = LocaleOr('consumables_desc_consume', 'Dauer: %s s | Fahrzeug: %s', FormatSeconds(consume.duration), vehicleText) },
-        { title = LocaleOr('consumables_section_animation', 'Animation'), value = 'animation', type = 'button', description = DescribeAnimation(consume) },
-        { title = LocaleOr('consumables_section_effects', 'Effekte'), value = 'effects', type = 'button', description = DescribeEffects(effects) },
-        { title = LocaleOr('consumables_section_hallucination', 'Halluzination'), value = 'hallucination', type = 'button',
-            description = DescribeHallucination(effects) },
+        { title = LocaleOr('consumables_entry_label', 'Label: %s', Escape(draft.label)), value = 'label', type = 'button' },
+        { title = LocaleOr('consumables_entry_cooldown', 'Cooldown: %s s', FormatSeconds(draft.cooldown)), value = 'cooldown', type = 'button' },
+        { title = LocaleOr('consumables_entry_duration', 'Konsumdauer: %s s', FormatSeconds(consume.duration)), value = 'consume_duration', type = 'button' },
+        { title = LocaleOr('consumables_entry_text', 'Konsumtext: %s', Escape(consume.text)), value = 'consume_text', type = 'button' },
+        { title = LocaleOr('consumables_entry_vehicle', 'Im Fahrzeug nutzbar: %s', BoolText(consume.allowInVehicle)), value = 'vehicle', type = 'button' },
+        { title = LocaleOr('consumables_entry_animation', 'Animation: %s', DescribeAnimation(consume)), value = 'animation', type = 'button' },
+        { title = LocaleOr('consumables_entry_effect_duration', 'Effektdauer: %s s', FormatSeconds(effects.duration)), value = 'effect_duration', type = 'button' },
+        { title = LocaleOr('consumables_entry_health', 'Leben: +%d', effects.health or 0), value = 'health', type = 'button' },
+        { title = LocaleOr('consumables_entry_armor', 'Ruestung: +%d', effects.armor or 0), value = 'armor', type = 'button' },
+        { title = LocaleOr('consumables_entry_speed', 'Tempo-Boost: %s', DescribeSpeed(effects.speed)), value = 'speed', type = 'button' },
+        { title = LocaleOr('consumables_entry_stamina', 'Unendliche Ausdauer: %s', BoolText(effects.stamina)), value = 'stamina', type = 'button' },
+        { title = LocaleOr('consumables_entry_hallucination', 'Rausch: %s', DescribeHallucination(effects)), value = 'hallucination', type = 'button' },
         { title = LocaleOr('save', 'Speichern'), value = 'save', type = 'button' },
     }
     if not isNew then
@@ -138,9 +147,9 @@ local function BuildDraftElements(draft, isNew)
     return elements
 end
 
-local function RunSectionEdit(itemName, draft, isNew, sectionValue)
+local function RunFieldEdit(itemName, draft, isNew, fieldValue)
     local sessionGen = ConsumablesCreatorFields.CurrentGeneration()
-    local editor = ConsumablesCreatorFields[SECTION_EDITORS[sectionValue]]
+    local editor = ConsumablesCreatorFields[FIELD_EDITORS[fieldValue]]
     local updated = editor(draft)
     if IsStale(sessionGen) then return end
     OpenDraftMenu(itemName, updated or draft, isNew)
@@ -219,8 +228,8 @@ OpenDraftMenu = function(itemName, draft, isNew)
             return
         end
         local value = data.current.value
-        if SECTION_EDITORS[value] then
-            CreateThread(function() RunSectionEdit(itemName, draft, isNew, value) end)
+        if FIELD_EDITORS[value] then
+            CreateThread(function() RunFieldEdit(itemName, draft, isNew, value) end)
         elseif value == 'save' then
             CreateThread(function() SaveDraft(itemName, draft, isNew) end)
         elseif value == 'delete' then

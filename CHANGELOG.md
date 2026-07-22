@@ -6,6 +6,34 @@ Alle relevanten Änderungen an FarmingCreator-X-Hex. Bei jedem Update sind die D
 
 ---
 
+## [1.4.0] – 2026-07-22
+
+### Geändert
+
+- **Einzelfeld-Bearbeitung im Consumables-Creator**: Der Item-Entwurf zeigt jede Einstellung als eigenen Menüeintrag mit aktuellem Wert (Label, Cooldown, Konsumdauer, Konsumtext, Fahrzeug, Animation, Effektdauer, Leben, Rüstung, Tempo-Boost, Ausdauer, Rausch). Ein Klick bearbeitet genau einen Wert – die bisherigen Abschnitts-Assistenten mit mehreren Eingaben hintereinander entfallen.
+- **Separate Felder für Leben und Rüstung**: Beide Effekte werden einzeln eingegeben (Leben 0–200, Rüstung 0–100; `0` oder leer entfernt den Effekt).
+- **Direkte Ja/Nein-Toggles**: „Im Fahrzeug nutzbar" und „Unendliche Ausdauer" schalten per Klick direkt um, ohne Eingabefenster.
+
+### Hinzugefügt
+
+- **ITEM-GUIDE.md**: Kompakte deutsche Schritt-für-Schritt-Anleitung „Item erstellen in 60 Sekunden" mit Vorlagen-Übersicht, Tabelle aller Felder samt Grenzen, Energy-Drink-Beispiel und den häufigsten Fehlern.
+
+### Zu ersetzende Dateien
+
+| Datei | Grund |
+| --- | --- |
+| `client/consumables_creator.lua` | flaches Einzelfeld-Menü statt Abschnitts-Buttons |
+| `client/modules/consumables_creator_fields.lua` | Einzelfeld-Editoren statt Abschnitts-Assistenten |
+| `locals/languages/de.lua` | neue und angepasste Locale-Keys |
+| `ITEM-GUIDE.md` | neue Datei |
+| `fxmanifest.lua` | Versions-Bump |
+| `README.md` | Doku-Update (optional) |
+| `CHANGELOG.md` | Changelog-Eintrag (optional) |
+
+Kein SQL-Import nötig.
+
+---
+
 ## [1.3.0] – 2026-07-21
 
 ### Hinzugefügt

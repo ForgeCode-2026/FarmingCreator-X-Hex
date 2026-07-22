@@ -14,6 +14,7 @@ Sammeln → Verarbeiten → Verkaufen → Konsumieren – komplett ohne Code, di
 - [Installation](#-installation)
 - [Befehle](#%EF%B8%8F-befehle)
 - [Berechtigungen](#-berechtigungen)
+- [Item-Guide: Item erstellen in 60 Sekunden](ITEM-GUIDE.md)
 - [Consumables](#-consumables)
   - [MySQL-Erstbefüllung (Seed)](#mysql-erstbefüllung-seed)
   - [Inventar-Anbindung](#inventar-anbindung)
@@ -135,7 +136,9 @@ Normale Spieler ohne Berechtigung werden mit einer Fehlermeldung abgewiesen; auc
 
 ## 💊 Consumables
 
-Neue Items starten im Creator aus einer fertigen Vorlage (Zigarette, Joint, Tablette, Kokain, Meth, Essen, Trinken oder Leer, definiert in `Config.ItemTemplates`) und sind direkt nach Name und Anzeigename mit „Speichern" fertig – alle Abschnitte bleiben zum Feintuning verfügbar.
+Neue Items starten im Creator aus einer fertigen Vorlage (Zigarette, Joint, Tablette, Kokain, Meth, Essen, Trinken oder Leer, definiert in `Config.ItemTemplates`) und sind direkt nach Name und Anzeigename mit „Speichern" fertig – jede Einstellung ist danach ein eigener Menüeintrag mit aktuellem Wert und lässt sich einzeln anpassen.
+
+➡️ Schritt-für-Schritt-Anleitung: **[ITEM-GUIDE.md – Item erstellen in 60 Sekunden](ITEM-GUIDE.md)**
 
 ### MySQL-Erstbefüllung (Seed)
 
@@ -191,7 +194,7 @@ Jedes Item wählt seine Animation auf eine von drei Arten:
 2. **Szenario**: ein GTA-Szenario wie `WORLD_HUMAN_SMOKING`.
 3. **Eigene Animation (Dict/Clip)**: `dict` + `clip`, optional `flag`, `blendIn`, `blendOut`, `playbackRate` sowie ein eigenes **Prop** (`model`, `bone`, `position`, `rotation` – Standard-Bone ist die rechte Hand).
 
-Alle drei Modi sind im Consumables Creator über den Abschnitt „Animation" konfigurierbar.
+Alle drei Modi sind im Consumables Creator über den Eintrag „Animation" konfigurierbar.
 
 ### Effekte & Rausch-Presets
 
