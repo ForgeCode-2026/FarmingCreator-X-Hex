@@ -5,6 +5,26 @@ local activeEffects = nil
 
 local DEFAULT_PROP_BONE = 28422
 local CONSUME_BLOCKED_CONTROLS = { 21, 22, 23, 24, 25, 37 }
+local MIN_PLAYER_SPEED = 1.0
+local MAX_PLAYER_SPEED = 1.49
+
+local function IsFiniteNumber(value)
+    return type(value) == 'number'
+        and value == value
+        and value ~= math.huge
+        and value ~= -math.huge
+end
+
+local function NormalizePlayerSpeed(value, fallback)
+    local normalizedFallback = IsFiniteNumber(fallback) and fallback or MIN_PLAYER_SPEED
+    local normalizedValue = IsFiniteNumber(value) and value or normalizedFallback
+    return math.min(MAX_PLAYER_SPEED, math.max(MIN_PLAYER_SPEED, normalizedValue))
+end
+
+local function ApplyPlayerSpeed(value)
+    local speed = NormalizePlayerSpeed(value, Config.Playerspeed)
+    SetRunSprintMultiplierForPlayer(PlayerId(), speed)
+end
 
 local function Notify(message, notifyType)
     TriggerEvent('forge_farming:notify', message, notifyType or 'info', 'Konsum')
@@ -130,7 +150,7 @@ local function ResetDrugEffects()
     local ped = PlayerPedId()
     local previous = activeEffects
 
-    SetRunSprintMultiplierForPlayer(PlayerId(), 1.0)
+    ApplyPlayerSpeed(Config.Playerspeed)
     SetPedMoveRateOverride(ped, 1.0)
     SetPedMotionBlur(ped, false)
     SetPedIsDrunk(ped, false)
@@ -183,6 +203,9 @@ local function RunEffectLoop(effectId, effects, endsAt, label)
 
         if IsEntityDead(currentPed) then break end
 
+        if effects.speed then
+            ApplyPlayerSpeed(effects.speed)
+        end
         if effects.stamina then
             RestorePlayerStamina(PlayerId(), 1.0)
         end
@@ -236,7 +259,7 @@ local function StartTimedEffects(definition, itemName)
     activeEffects = effects
 
     if effects.speed then
-        SetRunSprintMultiplierForPlayer(PlayerId(), math.min(1.49, math.max(1.0, effects.speed)))
+        ApplyPlayerSpeed(effects.speed)
     end
     if effects.hallucination then
         ApplyHallucination(effects.hallucination, ped)
@@ -323,10 +346,10 @@ AddEventHandler('forge_farming:consumables:start', function(token, itemName, def
     local canceled = RunConsumeLoop(duration)
 
     StopConsumeAnimation(PlayerPedId())
+    StopProgress()
     consuming = false
 
     if canceled then
-        StopProgress()
         Notify(LocaleOr('consumables_cancelled', 'Benutzung abgebrochen.'), 'error')
         TriggerServerEvent('forge_farming:consumables:cancel', token)
     else
@@ -339,7 +362,7 @@ AddEventHandler('forge_farming:consumables:apply', function(itemName, definition
     if type(definition) ~= 'table' then return end
 
     StartTimedEffects(definition, itemName)
-    Notify(LocaleOr('consumables_used', '%s wurde benutzt.', definition.label or itemName), 'success')
+    Notify(LocaleOr('consumables_used', 'Du hast %s konsumiert.', definition.label or itemName), 'success')
 end)
 
 exports('UseConsumable', function(data)

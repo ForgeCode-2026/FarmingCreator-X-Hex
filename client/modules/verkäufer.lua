@@ -184,7 +184,7 @@ CreateThread(function()
             end
         end
         if closestPoint and not menuOpen then
-            TriggerEvent('fc_hud:helpNotify', 'E', Locale('verkaeufer_menu_title'))
+            Framework.HelpNotify('E', Locale('verkaeufer_menu_title'))
             if IsControlJustPressed(0, 38) then
                 StartMenuSession(closestPoint)
             end

@@ -348,7 +348,7 @@ CreateThread(function()
             elseif hudState and hudState.status == 'ready' then
                 helpText = Locale('verarbeiter_hud_ready', hudState.totalRuns or 0)
             end
-            TriggerEvent('fc_hud:helpNotify', 'E', helpText)
+            Framework.HelpNotify('E', helpText)
 
             if IsControlJustPressed(0, 38) then
                 OpenVerarbeiterMenu(point)

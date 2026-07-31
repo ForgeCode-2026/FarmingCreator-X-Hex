@@ -5,7 +5,7 @@ Config.Consumables = {
     -- 'hex_4_inventory'  = HEX v4 Inventar
     -- 'jaksam_inventory' = jaksam Inventar
     Inventory = 'framework',
-    Progress = 'fc_hud',
+    Progress = 'automatic',
     RemoveItem = true,
     AllowCancel = true,
     CancelKey = 73,
@@ -14,6 +14,8 @@ Config.Consumables = {
     CreatorCommand = 'consumablescreator',
     RequestTimeoutMs = 5000,
 }
+
+Config.Playerspeed = 1.0
 
 Config.AnimationPresets = {
     rauchen = {

@@ -30,6 +30,14 @@ Config.PoliceAlert = {
     chance = 100,
 }
 
+Config.VersionCheck = {
+    Enabled = true,
+    Repository = 'ForgeCode-2026/FarmingCreator-X-Hex',
+    Branch = 'main',
+    DelayMs = 5000,
+    MaxChangelogLines = 40,
+}
+
 function SendPoliceAlert(source, coords, data)
 
 end
