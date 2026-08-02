@@ -124,7 +124,7 @@ local function handleInteraction(point, distance)
         return
     end
 
-    TriggerEvent('fc_hud:helpNotify', 'E', Locale('sammler_help_collect'))
+    Framework.HelpNotify('E', Locale('sammler_help_collect'))
 
     if IsControlJustPressed(0, CONTROL_INTERACT) then
         TriggerServerEvent('forge_farming:sammler:start', point.id)

@@ -6,6 +6,44 @@ Alle relevanten Änderungen an FarmingCreator-X-Hex. Bei jedem Update sind die D
 
 ---
 
+## [1.5.0] – 2026-08-01
+
+### Behoben
+
+- **Absoluter Consumable-Speed**: Ein Item-Speed überschreibt während der Wirkung den bereits erhöhten Server-Standard. Der Item-Wert wird im Effekt-Thread erneut gesetzt und nach Ablauf, Tod, Effektwechsel oder Ressourcenstopp durch `Config.Playerspeed` ersetzt.
+- **Gültiger Standard-Speed**: `Config.Playerspeed` ist jetzt eine Zahl statt einer Tabelle und wird vor der Übergabe an FiveM-Natives defensiv begrenzt.
+- **Consumable-Progress**: Die zuvor fehlenden clientseitigen Methoden `Framework.StartProgress` und `Framework.StopProgress` sind implementiert.
+
+### Hinzugefügt
+
+- **Automatische HEX-HUD-Erkennung**: `fc_hud`, Final HUD, Final HUD V2, Future HUD, Genesis HUD, Premium HUD, Free HUD und HUD V4 werden anhand ihres gestarteten Resource-Namens erkannt.
+- **Zentrale HUD-Schnittstelle**: Notify, HelpNotify, Announce und Progressbar laufen über `framework/init.lua`. Ohne unterstütztes HUD greifen sichere GTA-Fallbacks.
+- **Consumable-Erfolgsnachricht**: Nach dem serverseitig bestätigten Konsum erscheint genau eine Success-Notify mit dem lokalisierten Item-Namen.
+- **Konfigurierbarer Versions-Check**: Repository, Branch, Aktivierung, Startverzögerung und maximales Changelog-Ausgabelimit befinden sich in `shared/sv_config.lua`.
+- **Regressionstests**: Eigenständige Lua-Tests decken Speed-Lebenszyklus, alle unterstützten HUD-Resource-Namen sowie SemVer- und Changelog-Verarbeitung ab.
+
+### Zu ersetzende Dateien
+
+| Datei | Grund |
+| --- | --- |
+| `framework/init.lua` | zentraler automatischer HUD-Adapter |
+| `client/modules/farming.lua` | zentraler HelpNotify-Aufruf |
+| `client/modules/verarbeiter.lua` | zentraler HelpNotify-Aufruf |
+| `client/modules/verkäufer.lua` | zentraler HelpNotify-Aufruf |
+| `client/modules/consumables.lua` | absoluter Speed und Consumable-Notify |
+| `client/main.lua` | zentraler Platzierungs-Hinweis |
+| `shared/consumables_config.lua` | numerischer Standard-Speed und automatische Progress-Auswahl |
+| `shared/sv_config.lua` | GitHub-Versionseinstellungen |
+| `server/version_utils.lua` | sichere SemVer- und Changelog-Verarbeitung |
+| `server/version_check.lua` | gehärteter GitHub-Checker und txAdmin-Ausgabe |
+| `locals/languages/de.lua` | neue Consumable-Erfolgsnachricht |
+| `fxmanifest.lua` | Script-Eintrag und Versions-Bump |
+| `CHANGELOG.md` | Changelog-Eintrag |
+
+Kein SQL-Import nötig. Es wurden keine neuen Commands hinzugefügt.
+
+---
+
 ## [1.4.0] – 2026-07-22
 
 ### Geändert

@@ -175,26 +175,126 @@ if IsDuplicityVersion() then
 else
     Framework = {}
 
-    function Framework.StartProgress(text, duration)
-        if Config.Consumables.Progress == 'fc_hud' then
-            --TriggerEvent('fc_hud:progress', text, duration)
-            exports.a_hud:StartProgressBar(text, duration)
+    local HUD_RESOURCES = {
+        'hex_final_hud',
+        'hex_4_hud',
+        'hex_2_hud',
+        'hex_future_hud',
+        'hex_genesis_hud',
+        'hex_1_hud',
+        'hex_hud_prem',
+        'hex_hud',
+    }
+
+    local currentHelpNotify = nil
+    local activeProgressResource = nil
+
+    local function IsResourceStarted(resourceName)
+        return GetResourceState(resourceName) == 'started'
+    end
+
+    local function CallHudExport(resourceName, methodName, ...)
+        local arguments = { ... }
+        return pcall(function()
+            exports[resourceName][methodName](table.unpack(arguments))
+        end)
+    end
+
+    local function TryHudExport(methodName, ...)
+        for _, resourceName in ipairs(HUD_RESOURCES) do
+            if IsResourceStarted(resourceName)
+                and CallHudExport(resourceName, methodName, ...) then
+                return resourceName
+            end
         end
+        return nil
+    end
+
+    local function DrawFallbackHelp(message)
+        BeginTextCommandDisplayHelp('STRING')
+        AddTextComponentSubstringPlayerName(message)
+        EndTextCommandDisplayHelp(0, false, true, -1)
+    end
+
+    local function DrawFallbackNotify(title, message)
+        BeginTextCommandThefeedPost('STRING')
+        AddTextComponentSubstringPlayerName(('%s: %s'):format(title, message))
+        EndTextCommandThefeedPostTicker(false, false)
+    end
+
+    local function StartFallbackProgress(message)
+        BeginTextCommandBusyspinnerOn('STRING')
+        AddTextComponentSubstringPlayerName(message)
+        EndTextCommandBusyspinnerOn(4)
+    end
+
+    function Framework.HelpNotify(key, message)
+        local safeKey = tostring(key or 'E')
+        local safeMessage = tostring(message or '')
+
+        if IsResourceStarted('fc_hud') then
+            TriggerEvent('fc_hud:helpNotify', safeKey, safeMessage)
+            return
+        end
+        if TryHudExport('HelpNotify', safeMessage, safeKey) then return end
+        DrawFallbackHelp(safeMessage)
+    end
+
+    function Framework.ClearHelpNotify()
+        currentHelpNotify = nil
+        TryHudExport('HideHelpNotify')
+    end
+
+    function Framework.Notify(message, notifyType, title, duration)
+        local safeMessage = tostring(message or '')
+        local safeType = tostring(notifyType or 'info')
+        local safeTitle = tostring(title or 'Farming')
+        local safeDuration = tonumber(duration) or 5000
+
+        if IsResourceStarted('fc_hud') then
+            TriggerEvent('fc_hud:notify', safeType, safeTitle, safeMessage, safeDuration)
+            return
+        end
+        if TryHudExport('Notify', safeTitle, safeMessage, safeType, safeDuration) then return end
+        DrawFallbackNotify(safeTitle, safeMessage)
+    end
+
+    function Framework.Announce(message, title, duration)
+        local safeMessage = tostring(message or '')
+        local safeTitle = tostring(title or 'Farming')
+        local safeDuration = tonumber(duration) or 8000
+
+        if IsResourceStarted('fc_hud') then
+            TriggerEvent('fc_hud:announce', 'Farming', safeTitle, safeMessage, safeDuration)
+            return
+        end
+        if TryHudExport('Announce', safeTitle, safeMessage, safeDuration) then return end
+        DrawFallbackNotify(safeTitle, safeMessage)
+    end
+
+    function Framework.StartProgress(message, duration)
+        local safeMessage = tostring(message or '')
+        local safeDuration = math.max(0, tonumber(duration) or 0)
+        activeProgressResource = TryHudExport('StartProgressbar', safeDuration, safeMessage)
+        if activeProgressResource then return end
+        StartFallbackProgress(safeMessage)
     end
 
     function Framework.StopProgress()
-        if Config.Consumables.Progress == 'fc_hud' then
-            --TriggerEvent('fc_hud:progress', '', 0)
-            exports.a_hud:StopProgressBar()
-        end
-    end
+        local resourceName = activeProgressResource
+        activeProgressResource = nil
 
-    local currentHelpNotify = nil
+        if resourceName and IsResourceStarted(resourceName)
+            and CallHudExport(resourceName, 'StopProgressbar') then
+            return
+        end
+        BusyspinnerOff()
+    end
 
     CreateThread(function()
         while true do
             if currentHelpNotify then
-                TriggerEvent('esx:helpNotification', currentHelpNotify.key, currentHelpNotify.message)
+                Framework.HelpNotify(currentHelpNotify.key, currentHelpNotify.message)
                 Wait(0)
             else
                 Wait(500)
@@ -205,7 +305,7 @@ else
     RegisterNetEvent('forge_farming:notify')
     AddEventHandler('forge_farming:notify', function(message, notifyType, title)
         DebugPrint('Notify empfangen:', message, '(' .. tostring(notifyType) .. ')')
-       TriggerEvent('esx:showNotification', notifyType or 'info',title or 'Farming', message, 5000)
+        Framework.Notify(message, notifyType, title, 5000)
     end)
 
     RegisterNetEvent('forge_farming:helpNotify')
@@ -215,11 +315,11 @@ else
 
     RegisterNetEvent('forge_farming:clearHelpNotify')
     AddEventHandler('forge_farming:clearHelpNotify', function()
-        currentHelpNotify = nil
+        Framework.ClearHelpNotify()
     end)
 
     RegisterNetEvent('forge_farming:announce')
     AddEventHandler('forge_farming:announce', function(message, title, duration)
-        TriggerEvent('fc_hud:announce', 'Farming', title or 'Farming', message, duration or 8000)
+        Framework.Announce(message, title, duration)
     end)
 end

@@ -529,7 +529,7 @@ local function StartPlacementTool(projectId, pointType, pendingPointData, pointI
         DisablePlayerFiring(PlayerId(), true)
         DisableControlAction(0, 24, true)
         DisableControlAction(0, 25, true)
-        TriggerEvent('fc_hud:helpNotify', 'MOUSE1', helpText)
+        Framework.HelpNotify('MOUSE1', helpText)
 
         local targetCoords, surfaceNormal = GetPlacementTarget(Config.MaxPlacementDistance * 2.0)
 
