@@ -175,15 +175,26 @@ if IsDuplicityVersion() then
 else
     Framework = {}
 
-    local HUD_RESOURCES = {
-        'hex_final_hud',
-        'hex_4_hud',
-        'hex_2_hud',
-        'hex_future_hud',
-        'hex_genesis_hud',
+    local NOTIFY_HUD_RESOURCES = {
         'hex_1_hud',
-        'hex_hud_prem',
+        'hex_2_hud',
+        'hex_4_hud',
+        'hex_final_hud',
+        'hex_future_hud',
         'hex_hud',
+        'hex_hud_prem',
+        'hex_finalhud_v2',
+        'hex_genesis_hud',
+    }
+
+    local HELP_HUD_RESOURCES = {
+        'hex_2_hud',
+        'hex_4_hud',
+        'hex_final_hud',
+        'hex_future_hud',
+        'hex_hud_prem',
+        'hex_finalhud_v2',
+        'hex_genesis_hud',
     }
 
     local currentHelpNotify = nil
@@ -193,17 +204,10 @@ else
         return GetResourceState(resourceName) == 'started'
     end
 
-    local function CallHudExport(resourceName, methodName, ...)
-        local arguments = { ... }
-        return pcall(function()
-            exports[resourceName][methodName](table.unpack(arguments))
-        end)
-    end
-
-    local function TryHudExport(methodName, ...)
-        for _, resourceName in ipairs(HUD_RESOURCES) do
+    local function TryHudCall(resourceNames, callback)
+        for _, resourceName in ipairs(resourceNames) do
             if IsResourceStarted(resourceName)
-                and CallHudExport(resourceName, methodName, ...) then
+                and pcall(callback, resourceName) then
                 return resourceName
             end
         end
@@ -211,15 +215,14 @@ else
     end
 
     local function DrawFallbackHelp(message)
-        BeginTextCommandDisplayHelp('STRING')
-        AddTextComponentSubstringPlayerName(message)
-        EndTextCommandDisplayHelp(0, false, true, -1)
+        AddTextEntry('hex_farmingcreator_help', message)
+        DisplayHelpTextThisFrame('hex_farmingcreator_help', false)
     end
 
     local function DrawFallbackNotify(title, message)
-        BeginTextCommandThefeedPost('STRING')
+        SetNotificationTextEntry('STRING')
         AddTextComponentSubstringPlayerName(('%s: %s'):format(title, message))
-        EndTextCommandThefeedPostTicker(false, false)
+        DrawNotification(false, true)
     end
 
     local function StartFallbackProgress(message)
@@ -230,32 +233,40 @@ else
 
     function Framework.HelpNotify(key, message)
         local safeKey = tostring(key or 'E')
-        local safeMessage = tostring(message or '')
+        local cleanMessage = tostring(message or ''):gsub('~INPUT_PICKUP~', 'E')
 
         if IsResourceStarted('fc_hud') then
-            TriggerEvent('fc_hud:helpNotify', safeKey, safeMessage)
+            TriggerEvent('fc_hud:helpNotify', safeKey, cleanMessage)
             return
         end
-        if TryHudExport('HelpNotify', safeMessage, safeKey) then return end
-        DrawFallbackHelp(safeMessage)
+        local resourceName = TryHudCall(HELP_HUD_RESOURCES, function(hudResource)
+            exports[hudResource]:HelpNotify(cleanMessage)
+        end)
+        if resourceName then return end
+        DrawFallbackHelp(cleanMessage)
     end
 
     function Framework.ClearHelpNotify()
         currentHelpNotify = nil
-        TryHudExport('HideHelpNotify')
+        TryHudCall(HELP_HUD_RESOURCES, function(hudResource)
+            exports[hudResource]:HideHelpNotify()
+        end)
     end
 
-    function Framework.Notify(message, notifyType, title, duration)
+    function Framework.Notify(title, message, notifyType, timeout)
+        local safeTitle = tostring(title or 'Farming')
         local safeMessage = tostring(message or '')
         local safeType = tostring(notifyType or 'info')
-        local safeTitle = tostring(title or 'Farming')
-        local safeDuration = tonumber(duration) or 5000
+        local safeTimeout = tonumber(timeout) or 5000
 
         if IsResourceStarted('fc_hud') then
-            TriggerEvent('fc_hud:notify', safeType, safeTitle, safeMessage, safeDuration)
+            TriggerEvent('fc_hud:notify', safeType, safeTitle, safeMessage, safeTimeout)
             return
         end
-        if TryHudExport('Notify', safeTitle, safeMessage, safeType, safeDuration) then return end
+        local resourceName = TryHudCall(NOTIFY_HUD_RESOURCES, function(hudResource)
+            exports[hudResource]:Notify(safeTitle, safeMessage, safeType, safeTimeout)
+        end)
+        if resourceName then return end
         DrawFallbackNotify(safeTitle, safeMessage)
     end
 
@@ -268,14 +279,18 @@ else
             TriggerEvent('fc_hud:announce', 'Farming', safeTitle, safeMessage, safeDuration)
             return
         end
-        if TryHudExport('Announce', safeTitle, safeMessage, safeDuration) then return end
+        if TryHudCall(NOTIFY_HUD_RESOURCES, function(hudResource)
+            exports[hudResource]:Announce(safeTitle, safeMessage, safeDuration)
+        end) then return end
         DrawFallbackNotify(safeTitle, safeMessage)
     end
 
     function Framework.StartProgress(message, duration)
         local safeMessage = tostring(message or '')
         local safeDuration = math.max(0, tonumber(duration) or 0)
-        activeProgressResource = TryHudExport('StartProgressbar', safeDuration, safeMessage)
+        activeProgressResource = TryHudCall(NOTIFY_HUD_RESOURCES, function(hudResource)
+            exports[hudResource]:StartProgressbar(safeDuration, safeMessage)
+        end)
         if activeProgressResource then return end
         StartFallbackProgress(safeMessage)
     end
@@ -285,7 +300,9 @@ else
         activeProgressResource = nil
 
         if resourceName and IsResourceStarted(resourceName)
-            and CallHudExport(resourceName, 'StopProgressbar') then
+            and pcall(function()
+                exports[resourceName]:StopProgressbar()
+            end) then
             return
         end
         BusyspinnerOff()
@@ -305,7 +322,7 @@ else
     RegisterNetEvent('forge_farming:notify')
     AddEventHandler('forge_farming:notify', function(message, notifyType, title)
         DebugPrint('Notify empfangen:', message, '(' .. tostring(notifyType) .. ')')
-        Framework.Notify(message, notifyType, title, 5000)
+        Framework.Notify(title, message, notifyType, 5000)
     end)
 
     RegisterNetEvent('forge_farming:helpNotify')

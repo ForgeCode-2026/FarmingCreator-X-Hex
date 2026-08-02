@@ -49,9 +49,12 @@ end
 
 exports = setmetatable({}, {
     __index = function(_, resourceName)
-        return setmetatable({}, {
+        local resourceExports = {}
+        return setmetatable(resourceExports, {
             __index = function(_, methodName)
-                return function(...)
+                return function(self, ...)
+                    assert(self == resourceExports,
+                        ('%s muss mit Methodensyntax aufgerufen werden'):format(methodName))
                     RecordExport(resourceName, methodName, ...)
                 end
             end,
@@ -59,24 +62,21 @@ exports = setmetatable({}, {
     end,
 })
 
-function BeginTextCommandDisplayHelp()
-    calls[#calls + 1] = { kind = 'fallback', method = 'help' }
+function AddTextEntry(_, message)
+    calls[#calls + 1] = { kind = 'fallback', method = 'help', message = message }
+end
+
+function DisplayHelpTextThisFrame()
+end
+
+function SetNotificationTextEntry()
+    calls[#calls + 1] = { kind = 'fallback', method = 'notify' }
 end
 
 function AddTextComponentSubstringPlayerName()
 end
 
-function AddTextComponentString()
-end
-
-function EndTextCommandDisplayHelp()
-end
-
-function BeginTextCommandThefeedPost()
-    calls[#calls + 1] = { kind = 'fallback', method = 'notify' }
-end
-
-function EndTextCommandThefeedPostTicker()
+function DrawNotification()
 end
 
 function BeginTextCommandBusyspinnerOn()
@@ -105,6 +105,7 @@ local function AssertExport(resourceName, methodName, expectedArgs)
     AssertEqual(call.kind, 'export', 'Aufrufart')
     AssertEqual(call.resource, resourceName, 'Resource')
     AssertEqual(call.method, methodName, 'Export')
+    AssertEqual(#call.args, #expectedArgs, 'Argumentanzahl')
     for index, expected in ipairs(expectedArgs) do
         AssertEqual(call.args[index], expected, ('Argument %d'):format(index))
     end
@@ -121,34 +122,31 @@ AssertEqual(calls[1].args[1], 'E', 'FC HelpNotify Taste')
 AssertEqual(calls[1].args[2], 'Sammeln', 'FC HelpNotify Text')
 
 ResetCalls()
-Framework.Notify('Konsumiert', 'success', 'Konsum', 6000)
+Framework.Notify('Konsum', 'Konsumiert', 'success', 6000)
 AssertEqual(calls[1].method, 'notify', 'FC Notify Event')
 AssertEqual(calls[1].args[1], 'success', 'FC Notify Typ')
 AssertEqual(calls[1].args[2], 'Konsum', 'FC Notify Titel')
 AssertEqual(calls[1].args[3], 'Konsumiert', 'FC Notify Text')
 AssertEqual(calls[1].args[4], 6000, 'FC Notify Dauer')
 
-local hudResources = {
-    'hex_final_hud',
-    'hex_4_hud',
-    'hex_2_hud',
-    'hex_future_hud',
-    'hex_genesis_hud',
+local notifyHudResources = {
     'hex_1_hud',
-    'hex_hud_prem',
+    'hex_2_hud',
+    'hex_4_hud',
+    'hex_final_hud',
+    'hex_future_hud',
     'hex_hud',
+    'hex_hud_prem',
+    'hex_finalhud_v2',
+    'hex_genesis_hud',
 }
 
-for _, resourceName in ipairs(hudResources) do
+for _, resourceName in ipairs(notifyHudResources) do
     startedResource = resourceName
 
     ResetCalls()
-    Framework.Notify('Nachricht', 'success', 'Titel', 5000)
+    Framework.Notify('Titel', 'Nachricht', 'success', 5000)
     AssertExport(resourceName, 'Notify', { 'Titel', 'Nachricht', 'success', 5000 })
-
-    ResetCalls()
-    Framework.HelpNotify('E', 'Benutzen')
-    AssertExport(resourceName, 'HelpNotify', { 'Benutzen', 'E' })
 
     ResetCalls()
     Framework.Announce('Servermeldung', 'Farming', 8000)
@@ -163,14 +161,32 @@ for _, resourceName in ipairs(hudResources) do
     AssertExport(resourceName, 'StopProgressbar', {})
 end
 
+local helpHudResources = {
+    'hex_2_hud',
+    'hex_4_hud',
+    'hex_final_hud',
+    'hex_future_hud',
+    'hex_hud_prem',
+    'hex_finalhud_v2',
+    'hex_genesis_hud',
+}
+
+for _, resourceName in ipairs(helpHudResources) do
+    startedResource = resourceName
+    ResetCalls()
+    Framework.HelpNotify('E', '~INPUT_PICKUP~ Benutzen')
+    AssertExport(resourceName, 'HelpNotify', { 'E Benutzen' })
+end
+
 startedResource = nil
 ResetCalls()
 Framework.HelpNotify('E', 'Fallback')
 AssertEqual(calls[1].kind, 'fallback', 'Help-Fallback')
 AssertEqual(calls[1].method, 'help', 'Help-Fallback Methode')
+AssertEqual(calls[1].message, 'Fallback', 'Help-Fallback Text')
 
 ResetCalls()
-Framework.Notify('Fallback', 'info', 'Farming', 5000)
+Framework.Notify('Farming', 'Fallback', 'info', 5000)
 AssertEqual(calls[1].method, 'notify', 'Notify-Fallback')
 
 ResetCalls()
