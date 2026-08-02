@@ -350,4 +350,3 @@ git commit -m "fix: correct HUD notification adapters"
 
 Expected: one focused Conventional Commit containing the production adapter
 change and its regression coverage.
-

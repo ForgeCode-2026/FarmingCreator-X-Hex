@@ -1,5 +1,8 @@
 local calls = {}
-local startedResource = nil
+local startedResources = {}
+local failedExports = {}
+local exportAttempts = {}
+local eventHandlers = {}
 local createdThreads = {}
 
 Config = {}
@@ -12,14 +15,15 @@ function DebugPrint()
 end
 
 function GetResourceState(resourceName)
-    if resourceName == startedResource then return 'started' end
+    if startedResources[resourceName] then return 'started' end
     return 'missing'
 end
 
 function RegisterNetEvent()
 end
 
-function AddEventHandler()
+function AddEventHandler(eventName, callback)
+    eventHandlers[eventName] = callback
 end
 
 function CreateThread(callback)
@@ -55,6 +59,11 @@ exports = setmetatable({}, {
                 return function(self, ...)
                     assert(self == resourceExports,
                         ('%s muss mit Methodensyntax aufgerufen werden'):format(methodName))
+                    local exportName = ('%s:%s'):format(resourceName, methodName)
+                    exportAttempts[exportName] = (exportAttempts[exportName] or 0) + 1
+                    if failedExports[exportName] then
+                        error(('Export fehlgeschlagen: %s'):format(exportName))
+                    end
                     RecordExport(resourceName, methodName, ...)
                 end
             end,
@@ -66,6 +75,13 @@ function AddTextEntry(_, message)
     calls[#calls + 1] = { kind = 'fallback', method = 'help', message = message }
 end
 
+local function SetStartedResources(...)
+    startedResources = {}
+    for _, resourceName in ipairs({ ... }) do
+        startedResources[resourceName] = true
+    end
+end
+
 function DisplayHelpTextThisFrame()
 end
 
@@ -73,7 +89,8 @@ function SetNotificationTextEntry()
     calls[#calls + 1] = { kind = 'fallback', method = 'notify' }
 end
 
-function AddTextComponentSubstringPlayerName()
+function AddTextComponentSubstringPlayerName(message)
+    calls[#calls + 1] = { kind = 'fallback', method = 'text', text = message }
 end
 
 function DrawNotification()
@@ -92,6 +109,7 @@ end
 
 local function ResetCalls()
     calls = {}
+    exportAttempts = {}
 end
 
 local function AssertEqual(actual, expected, message)
@@ -113,7 +131,7 @@ end
 
 dofile('framework/init.lua')
 
-startedResource = 'fc_hud'
+SetStartedResources('fc_hud')
 Framework.HelpNotify('E', 'Sammeln')
 AssertEqual(calls[1].kind, 'event', 'FC HelpNotify Aufrufart')
 AssertEqual(calls[1].resource, 'fc_hud', 'FC HelpNotify Resource')
@@ -129,6 +147,24 @@ AssertEqual(calls[1].args[2], 'Konsum', 'FC Notify Titel')
 AssertEqual(calls[1].args[3], 'Konsumiert', 'FC Notify Text')
 AssertEqual(calls[1].args[4], 6000, 'FC Notify Dauer')
 
+SetStartedResources('fc_hud', 'hex_1_hud')
+ResetCalls()
+Framework.Notify('Prioritaet', 'FC zuerst', 'info', 5000)
+AssertEqual(calls[1].kind, 'event', 'FC vor HEX')
+AssertEqual(calls[1].resource, 'fc_hud', 'FC Prioritaet Resource')
+
+SetStartedResources('hex_1_hud', 'hex_2_hud')
+ResetCalls()
+Framework.Notify('Prioritaet', 'Erster HEX', 'info', 5000)
+AssertExport('hex_1_hud', 'Notify', { 'Prioritaet', 'Erster HEX', 'info', 5000 })
+
+failedExports['hex_1_hud:Notify'] = true
+ResetCalls()
+Framework.Notify('Fallback', 'Zweiter HEX', 'info', 5000)
+AssertEqual(exportAttempts['hex_1_hud:Notify'], 1, 'Fehlender erster HEX Versuch')
+AssertExport('hex_2_hud', 'Notify', { 'Fallback', 'Zweiter HEX', 'info', 5000 })
+failedExports['hex_1_hud:Notify'] = nil
+
 local notifyHudResources = {
     'hex_1_hud',
     'hex_2_hud',
@@ -142,7 +178,7 @@ local notifyHudResources = {
 }
 
 for _, resourceName in ipairs(notifyHudResources) do
-    startedResource = resourceName
+    SetStartedResources(resourceName)
 
     ResetCalls()
     Framework.Notify('Titel', 'Nachricht', 'success', 5000)
@@ -172,13 +208,13 @@ local helpHudResources = {
 }
 
 for _, resourceName in ipairs(helpHudResources) do
-    startedResource = resourceName
+    SetStartedResources(resourceName)
     ResetCalls()
     Framework.HelpNotify('E', '~INPUT_PICKUP~ Benutzen')
     AssertExport(resourceName, 'HelpNotify', { 'E Benutzen' })
 end
 
-startedResource = nil
+SetStartedResources()
 ResetCalls()
 Framework.HelpNotify('E', 'Fallback')
 AssertEqual(calls[1].kind, 'fallback', 'Help-Fallback')
@@ -188,9 +224,32 @@ AssertEqual(calls[1].message, 'Fallback', 'Help-Fallback Text')
 ResetCalls()
 Framework.Notify('Farming', 'Fallback', 'info', 5000)
 AssertEqual(calls[1].method, 'notify', 'Notify-Fallback')
+AssertEqual(calls[2].method, 'text', 'Notify-Fallback Text Aufruf')
+AssertEqual(calls[2].text, 'Farming: Fallback', 'Notify-Fallback Text')
 
 ResetCalls()
+Framework.Announce('Fallback-Ankuendigung', 'Farming', 5000)
+AssertEqual(calls[1].method, 'notify', 'Announce-Fallback')
+AssertEqual(calls[2].text, 'Farming: Fallback-Ankuendigung', 'Announce-Fallback Text')
+
+SetStartedResources('hex_2_hud')
+ResetCalls()
+Framework.ClearHelpNotify()
+AssertExport('hex_2_hud', 'HideHelpNotify', {})
+
+SetStartedResources('hex_1_hud')
+ResetCalls()
 Framework.StartProgress('Fallback', 1000)
-AssertEqual(calls[1].method, 'progress', 'Progress-Fallback')
+AssertExport('hex_1_hud', 'StartProgressbar', { 1000, 'Fallback' })
+
+SetStartedResources()
+ResetCalls()
+Framework.StopProgress()
+AssertEqual(calls[1].method, 'stopProgress', 'StopProgress-Fallback')
+
+SetStartedResources('hex_1_hud')
+ResetCalls()
+eventHandlers['forge_farming:notify']('Netzwerk Nachricht', 'warning', 'Netzwerk Titel')
+AssertExport('hex_1_hud', 'Notify', { 'Netzwerk Titel', 'Netzwerk Nachricht', 'warning', 5000 })
 
 print('PASS test_framework_hud')
