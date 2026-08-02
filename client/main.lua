@@ -908,6 +908,7 @@ function OpenPointDetailMenu(pointId)
     end, function() end)
 end
 
-RegisterCommand('farmingcreator', function()
+RegisterNetEvent('forge_farming:creator:open')
+AddEventHandler('forge_farming:creator:open', function()
     OpenProjectListMenu()
-end, false)
+end)

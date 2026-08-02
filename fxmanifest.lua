@@ -28,6 +28,7 @@ client_scripts {
 server_scripts {
     '@oxmysql/lib/MySQL.lua',
     'shared/sv_config.lua',
+    'server/creator_access.lua',
     'server/modules/farming.lua',
     'server/modules/verarbeiter.lua',
     'server/modules/verkäufer.lua',

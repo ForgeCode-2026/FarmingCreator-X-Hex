@@ -203,16 +203,16 @@ AddEventHandler('forge_farming:consumables:creator:delete', function(itemName)
     FinishCreatorMutation(src, 'delete', itemName, ok, errorCode)
 end)
 
-RegisterCommand(Config.Consumables.CreatorCommand, function(commandSource)
-    local src = commandSource
-    if not src or src <= 0 then return end
-    if not IsReady() then return end
-    if not Framework.HasPermission(src) then
-        Framework.Notify(src, CreatorErrorText('no_permission'), 'error')
-        return
-    end
-    TriggerClientEvent('forge_farming:consumables:openCreator', src, registry:Snapshot())
-end, false)
+CreatorAccess.RegisterCommand(Config.Consumables.CreatorCommand, {
+    isReady = IsReady,
+    deniedMessage = CreatorErrorText('no_permission'),
+    open = function(source)
+        TriggerClientEvent(
+            'forge_farming:consumables:openCreator',
+            source,
+            registry:Snapshot())
+    end,
+})
 
 AddEventHandler('playerDropped', function()
     local src = source

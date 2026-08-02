@@ -13,6 +13,7 @@ Alle relevanten Änderungen an FarmingCreator-X-Hex. Bei jedem Update sind die D
 - **Absoluter Consumable-Speed**: Ein Item-Speed überschreibt während der Wirkung den bereits erhöhten Server-Standard. Der Item-Wert wird im Effekt-Thread erneut gesetzt und nach Ablauf, Tod, Effektwechsel oder Ressourcenstopp durch `Config.Playerspeed` ersetzt.
 - **Gültiger Standard-Speed**: `Config.Playerspeed` ist jetzt eine Zahl statt einer Tabelle und wird vor der Übergabe an FiveM-Natives defensiv begrenzt.
 - **Consumable-Progress**: Die zuvor fehlenden clientseitigen Methoden `Framework.StartProgress` und `Framework.StopProgress` sind implementiert.
+- **Creator-Admin-Gate**: `/farmingcreator` und `/consumablescreator` öffnen ihre Menüs nur nach einer gemeinsamen serverseitigen Prüfung über die konfigurierten ESX-/QBCore-Adminrechte. Abgewiesene Spieler erhalten „Keine Berechtigung“; alle Mutation-Checks bleiben erhalten.
 
 ### Hinzugefügt
 
@@ -31,11 +32,15 @@ Alle relevanten Änderungen an FarmingCreator-X-Hex. Bei jedem Update sind die D
 | `client/modules/verarbeiter.lua` | zentraler HelpNotify-Aufruf |
 | `client/modules/verkäufer.lua` | zentraler HelpNotify-Aufruf |
 | `client/modules/consumables.lua` | absoluter Speed und Consumable-Notify |
-| `client/main.lua` | zentraler Platzierungs-Hinweis |
+| `client/main.lua` | zentraler Platzierungs-Hinweis und autorisiertes Open-Event |
 | `shared/consumables_config.lua` | numerischer Standard-Speed und automatische Progress-Auswahl |
 | `shared/sv_config.lua` | GitHub-Versionseinstellungen |
 | `server/version_utils.lua` | sichere SemVer- und Changelog-Verarbeitung |
 | `server/version_check.lua` | gehärteter GitHub-Checker und txAdmin-Ausgabe |
+| `server/creator_access.lua` | gemeinsame serverseitige Creator-Admin-Prüfung |
+| `server/modules/consumables.lua` | geschützter Consumables-Creator-Command |
+| `server/main.lua` | geschützter Farming-Creator-Command |
+| `tests/test_creator_access.lua` | Regressionstest für die Creator-Zugriffsprüfung |
 | `locals/languages/de.lua` | neue Consumable-Erfolgsnachricht |
 | `fxmanifest.lua` | Script-Eintrag und Versions-Bump |
 | `CHANGELOG.md` | Changelog-Eintrag |

@@ -228,6 +228,13 @@ local function EnsureCreatorPermission(src)
     return false
 end
 
+CreatorAccess.RegisterCommand('farmingcreator', {
+    deniedMessage = Locale('error_no_permission'),
+    open = function(source)
+        TriggerClientEvent('forge_farming:creator:open', source)
+    end,
+})
+
 local function LoadProjects()
     local rows = MySQL.query.await('SELECT * FROM forge_farming_projects', {}) or {}
     for _, row in ipairs(rows) do
