@@ -4,7 +4,7 @@ lua54 'yes'
 
 author 'Forge-Code.xyz'
 description 'FarmingCreator mit Hex Menu Api'
-version '1.5.1'
+version '1.5.2'
 
 shared_scripts {
     'shared/config.lua',
@@ -18,7 +18,7 @@ shared_scripts {
 client_scripts {
     'client/modules/farming.lua',
     'client/modules/verarbeiter.lua',
-    'client/modules/verkäufer.lua',
+    'client/modules/verkaeufer.lua',
     'client/modules/consumables.lua',
     'client/modules/consumables_creator_fields.lua',
     'client/consumables_creator.lua',
@@ -31,7 +31,7 @@ server_scripts {
     'server/creator_access.lua',
     'server/modules/farming.lua',
     'server/modules/verarbeiter.lua',
-    'server/modules/verkäufer.lua',
+    'server/modules/verkaeufer.lua',
     'server/consumables/consumables_store.lua',
     'server/consumables/consumables_registry.lua',
     'server/consumables/consumables_use_service.lua',

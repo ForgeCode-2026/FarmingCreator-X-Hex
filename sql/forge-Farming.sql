@@ -59,22 +59,6 @@ CREATE TABLE IF NOT EXISTS `forge_farming_points` (
         ON DELETE CASCADE
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
-ALTER TABLE `forge_farming_points`
-    ADD COLUMN IF NOT EXISTS `show_blip` TINYINT(1) NOT NULL DEFAULT 1
-    COMMENT 'Ob dieser Punkt einen Map-Blip bekommt, im Creator pro Punkt einstellbar';
-
-ALTER TABLE `forge_farming_points`
-    ADD COLUMN IF NOT EXISTS `police_alert` TINYINT(1) NOT NULL DEFAULT 0
-    COMMENT 'Ob an diesem Verkäufer-Punkt (Auszahlung Schwarzgeld) ein Polizei-Alarm ausgelöst wird';
-
-ALTER TABLE `forge_farming_points`
-    ADD COLUMN IF NOT EXISTS `blip_sprite` INT NULL
-    COMMENT 'Blip-Symbol (Sprite-ID) pro Punkt; NULL = Typ-Standard';
-
-ALTER TABLE `forge_farming_points`
-    ADD COLUMN IF NOT EXISTS `blip_color` INT NULL
-    COMMENT 'Blip-Farbe (0-85) pro Punkt; NULL = Typ-Standard';
-
 CREATE TABLE IF NOT EXISTS `forge_farming_jobs` (
     `id`                INT UNSIGNED    NOT NULL AUTO_INCREMENT,
     `player_identifier` VARCHAR(64)     NOT NULL,

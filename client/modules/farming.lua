@@ -86,6 +86,7 @@ local function findClosestSammler(playerCoords)
 
     local closestPoint = nil
     local closestDistance = nil
+    local anyVisible = false
 
     for _, point in pairs(ClientFarmPoints) do
         if point.type == 'sammler' then
@@ -94,6 +95,7 @@ local function findClosestSammler(playerCoords)
 
             if distance <= DRAW_DISTANCE then
                 drawSammlerMarker(point)
+                anyVisible = true
             end
 
             if not closestDistance or distance < closestDistance then
@@ -103,7 +105,7 @@ local function findClosestSammler(playerCoords)
         end
     end
 
-    return closestPoint, closestDistance
+    return closestPoint, closestDistance, anyVisible
 end
 
 local function handleInteraction(point, distance)
@@ -170,9 +172,9 @@ CreateThread(function()
             end
         end
 
-        local closestPoint, closestDistance = findClosestSammler(playerCoords)
+        local closestPoint, closestDistance, anyVisible = findClosestSammler(playerCoords)
         handleInteraction(closestPoint, closestDistance)
-        Wait(0)
+        Wait((anyVisible or isCollecting) and 0 or 500)
     end
 end)
 

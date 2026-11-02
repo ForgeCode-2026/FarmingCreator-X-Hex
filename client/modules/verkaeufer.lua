@@ -1,5 +1,6 @@
 local spawnedPeds = {}
 local pendingSpawns = {}
+local failedSpawns = {}
 local menuOpen = false
 local sellableItemsPromise = nil
 
@@ -54,9 +55,16 @@ AddEventHandler('forge_farming:verkaeufer:sellableItems', function(items)
 end)
 
 local function RequestSellableItems(pointId)
-    sellableItemsPromise = promise.new()
+    local pending = promise.new()
+    sellableItemsPromise = pending
     TriggerServerEvent('forge_farming:verkaeufer:getSellableItems', pointId)
-    return Citizen.Await(sellableItemsPromise)
+    SetTimeout(5000, function()
+        if sellableItemsPromise == pending then
+            sellableItemsPromise = nil
+            pending:resolve(nil)
+        end
+    end)
+    return Citizen.Await(pending)
 end
 
 local function BuildSellOptions(items)
@@ -106,7 +114,13 @@ local function DrawVendorMarker(point)
 end
 
 local function SpawnVendorPed(point)
-    local model = joaat(point.pedModel)
+    local model = type(point.pedModel) == 'string' and joaat(point.pedModel)
+    if not model or not IsModelInCdimage(model) or not IsModelAPed(model) then
+        failedSpawns[point.id] = true
+        pendingSpawns[point.id] = nil
+        DebugPrint('Invalid ped model for point', point.id, point.pedModel)
+        return
+    end
     RequestModel(model)
     local timeout = GetGameTimer() + 10000
     while not HasModelLoaded(model) do
@@ -127,7 +141,7 @@ local function SpawnVendorPed(point)
 end
 
 local function EnsureVendorPed(point)
-    if spawnedPeds[point.id] or pendingSpawns[point.id] then
+    if spawnedPeds[point.id] or pendingSpawns[point.id] or failedSpawns[point.id] then
         return
     end
     pendingSpawns[point.id] = true
@@ -149,7 +163,10 @@ end
 local function StartMenuSession(point)
     CreateThread(function()
         menuOpen = true
-        OpenVerkaeuferMenu(point)
+        local ok, err = pcall(OpenVerkaeuferMenu, point)
+        if not ok then
+            DebugPrint('Vendor menu failed:', err)
+        end
         menuOpen = false
     end)
 end

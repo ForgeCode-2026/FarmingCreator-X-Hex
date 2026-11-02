@@ -11,13 +11,6 @@ AddEventHandler('forge_farming:sync:points', function(points)
     ClientFarmPoints = points
 end)
 
-AddEventHandler('onResourceStart', function(resourceName)
-    if resourceName ~= GetCurrentResourceName() then
-        return
-    end
-    TriggerServerEvent('forge_farming:requestSync')
-end)
-
 TriggerServerEvent('forge_farming:requestSync')
 
 local function KeyboardInput(title, maxLength, regex)
@@ -416,7 +409,7 @@ local function GetWallBackHeading(surfaceNormal)
     if not surfaceNormal or math.abs(surfaceNormal.z) > 0.5 then
         return nil
     end
-    return math.deg(math.atan(surfaceNormal.x, surfaceNormal.y)) % 360.0
+    return math.deg(math.atan(-surfaceNormal.x, surfaceNormal.y)) % 360.0
 end
 
 local function DrawSammlerPreview(pendingPointData, coords, color)
@@ -432,7 +425,7 @@ end
 local function DrawMarkerPreview(markerType, markerRadius, markerHeightOffset, coords, color)
     local typeZOffset = markerType ~= 1 and (Config.FloatingMarkerZOffset or 1.5) or 0.0
     DrawMarker(markerType, coords.x, coords.y, coords.z + markerHeightOffset + typeZOffset, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0,
-        markerRadius * 2.0, markerRadius * 2.0, 1.0,
+        markerRadius, markerRadius, markerRadius * 0.5,
         color.r, color.g, color.b, color.a, false, false, 2, false, nil, nil, false)
 end
 
@@ -519,6 +512,10 @@ local function StartPlacementTool(projectId, pointType, pendingPointData, pointI
     local previewPed = nil
     if pendingPointData.placementMode == 'npc' then
         previewPed = CreatePreviewPed(pendingPointData.pedModel)
+        if not previewPed then
+            Framework.Notify(nil, Locale('error_invalid_ped_model'), 'error')
+            return OpenPointListMenu(projectId, pointType)
+        end
     end
 
     local previewHeading = GetEntityHeading(PlayerPedId())
@@ -529,6 +526,8 @@ local function StartPlacementTool(projectId, pointType, pendingPointData, pointI
         DisablePlayerFiring(PlayerId(), true)
         DisableControlAction(0, 24, true)
         DisableControlAction(0, 25, true)
+        DisableControlAction(0, CONTROL_ROTATE_LEFT, true)
+        DisableControlAction(0, CONTROL_ROTATE_RIGHT, true)
         Framework.HelpNotify('MOUSE1', helpText)
 
         local targetCoords, surfaceNormal = GetPlacementTarget(Config.MaxPlacementDistance * 2.0)
@@ -536,8 +535,6 @@ local function StartPlacementTool(projectId, pointType, pendingPointData, pointI
         if pendingPointData.placementMode == 'marker' then
             AdjustMarkerRadius(pendingPointData)
         else
-            DisableControlAction(0, CONTROL_ROTATE_LEFT, true)
-            DisableControlAction(0, CONTROL_ROTATE_RIGHT, true)
             previewHeading = AdjustPreviewHeading(previewHeading, GetWallBackHeading(surfaceNormal))
         end
 
@@ -608,8 +605,16 @@ local function HandleProjectDetailSelect(projectId, project, value)
         return
     end
     if value == 'delete' then
-        TriggerServerEvent('forge_farming:creator:deleteProject', projectId)
         CreateThread(function()
+            exports['hex_menu_api']:rageCloseAll()
+            local choice = SelectFromList('rageui_creator_confirm_delete', Locale('creator_delete_project_confirm', project.label), {
+                { label = Locale('no'), value = 'no' },
+                { label = Locale('yes'), value = 'yes' },
+            })
+            if choice ~= 'yes' then
+                return OpenProjectDetailMenu(projectId)
+            end
+            TriggerServerEvent('forge_farming:creator:deleteProject', projectId)
             Wait(250)
             OpenProjectListMenu()
         end)
@@ -826,8 +831,13 @@ function OpenSellPriceDeleteMenu(projectId, index)
                 return OpenProjectListMenu()
             end
             local sellPrices = CopySellPrices(currentProject.sellPrices)
-            table.remove(sellPrices, index)
-            SendProjectUpdate(currentProject, sellPrices)
+            for i, current in ipairs(sellPrices) do
+                if current.item == entry.item and current.minPrice == entry.minPrice and current.maxPrice == entry.maxPrice then
+                    table.remove(sellPrices, i)
+                    SendProjectUpdate(currentProject, sellPrices)
+                    break
+                end
+            end
             CreateThread(function()
                 Wait(250)
                 OpenSellPriceListMenu(projectId)

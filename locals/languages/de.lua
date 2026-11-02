@@ -203,4 +203,10 @@ Locales['de'] = {
     consumables_progress_default = 'Du benutzt %s ...',
     consumables_not_now = 'Du kannst dieses Item gerade nicht benutzen.',
     consumables_not_in_vehicle = 'Du kannst dieses Item nicht im Fahrzeug benutzen.',
+    error_recipe_has_active_jobs = 'Für dieses Rezept gibt es noch laufende oder nicht abgeholte Aufträge',
+    error_invalid_ped_model = 'Ungültiges Ped-Modell',
+    error_payout_failed = 'Auszahlung fehlgeschlagen, deine Items wurden zurückgegeben',
+    error_database = 'Datenbankfehler, bitte erneut versuchen',
+    error_inventory_full = 'Dein Inventar ist voll',
+    creator_delete_project_confirm = 'Projekt "%s" wirklich löschen?',
 }

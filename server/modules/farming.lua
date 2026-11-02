@@ -1,12 +1,32 @@
 local currentMultiplier = 1
 
+local function IsInsideWindow(window, now)
+    if window.from <= window.to then
+        return window.from <= now and now < window.to
+    end
+    return now >= window.from or now < window.to
+end
+
 local function ResolveBoostMultiplier(now)
     for _, window in ipairs(Config.BoostWindows) do
-        if window.from <= now and now < window.to then
+        if IsInsideWindow(window, now) then
             return window.multiplier
         end
     end
     return 1
+end
+
+local function FormatMultiplier(multiplier)
+    return tostring(math.tointeger(multiplier) or multiplier)
+end
+
+local function AnnounceBoost(template, multiplier)
+    local ok, message = pcall(string.format, template, FormatMultiplier(multiplier))
+    if not ok then
+        DebugPrint('Invalid boost announce template:', message)
+        return
+    end
+    Framework.Announce(message)
 end
 
 function GetActiveBoostMultiplier()
@@ -18,12 +38,14 @@ CreateThread(function()
         local newMultiplier = ResolveBoostMultiplier(os.date('%H:%M'))
 
         if newMultiplier ~= currentMultiplier then
-            if currentMultiplier == 1 then
-                Framework.Announce(string.format(Config.BoostStartAnnounce, newMultiplier))
-            elseif newMultiplier == 1 then
-                Framework.Announce(string.format(Config.BoostEndAnnounce, currentMultiplier))
-            end
+            local previousMultiplier = currentMultiplier
             currentMultiplier = newMultiplier
+
+            if newMultiplier == 1 then
+                AnnounceBoost(Config.BoostEndAnnounce, previousMultiplier)
+            else
+                AnnounceBoost(Config.BoostStartAnnounce, newMultiplier)
+            end
         end
 
         Wait(60000)

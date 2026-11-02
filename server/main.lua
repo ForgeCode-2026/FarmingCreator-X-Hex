@@ -5,6 +5,27 @@ RecipeProjectIndex = {}
 local VALID_POINT_TYPES = { sammler = true, verarbeiter = true, verkaeufer = true }
 local VALID_PLACEMENT_MODES = { marker = true, npc = true }
 local VALID_PAYOUT_ACCOUNTS = { cash = true, bank = true, black_money = true }
+local MAX_DB_INT = 2147483647
+local MAX_COORD = 100000.0
+local SYNC_COOLDOWN_MS = 2000
+
+local lastSyncRequest = {}
+
+local POINT_MIGRATIONS = {
+    { column = 'show_blip', definition = 'TINYINT(1) NOT NULL DEFAULT 1' },
+    { column = 'police_alert', definition = 'TINYINT(1) NOT NULL DEFAULT 0' },
+    { column = 'blip_sprite', definition = 'INT NULL' },
+    { column = 'blip_color', definition = 'INT NULL' },
+}
+
+function SafeQuery(method, query, parameters)
+    local ok, result = pcall(method.await, query, parameters)
+    if not ok then
+        DebugPrint('Database error:', result)
+        return nil
+    end
+    return result
+end
 
 local function DecodeJsonColumn(value)
     if type(value) == 'table' then
@@ -64,8 +85,16 @@ function SendDiscordWebhook(url, title, color, fields)
     })
 end
 
-local function IsNonEmptyString(value)
-    return type(value) == 'string' and value ~= ''
+local function IsNonEmptyString(value, maxLength)
+    return type(value) == 'string' and value ~= '' and #value <= maxLength
+end
+
+local function IsIntegerInRange(value, min, max)
+    return type(value) == 'number' and value == math.floor(value) and value >= min and value <= max
+end
+
+local function IsNumberInRange(value, min, max)
+    return type(value) == 'number' and value == value and value >= min and value <= max
 end
 
 local function IsValidSellPrices(sellPrices)
@@ -77,11 +106,9 @@ local function IsValidSellPrices(sellPrices)
     end
     for _, entry in ipairs(sellPrices) do
         if type(entry) ~= 'table'
-            or not IsNonEmptyString(entry.item)
-            or type(entry.minPrice) ~= 'number'
-            or type(entry.maxPrice) ~= 'number'
-            or entry.minPrice < 0
-            or entry.maxPrice < entry.minPrice then
+            or not IsNonEmptyString(entry.item, 50)
+            or not IsIntegerInRange(entry.minPrice, 0, MAX_DB_INT)
+            or not IsIntegerInRange(entry.maxPrice, entry.minPrice, MAX_DB_INT) then
             return false
         end
     end
@@ -92,15 +119,12 @@ local function IsValidProjectData(data)
     if type(data) ~= 'table' then
         return false
     end
-    if not IsNonEmptyString(data.label) or not IsNonEmptyString(data.rawItem) then
+    if not IsNonEmptyString(data.label, 100) or not IsNonEmptyString(data.rawItem, 50) then
         return false
     end
-    if type(data.rawMinAmount) ~= 'number'
-        or type(data.rawMaxAmount) ~= 'number'
-        or type(data.gatherDuration) ~= 'number' then
-        return false
-    end
-    if data.rawMinAmount < 0 or data.rawMaxAmount < data.rawMinAmount or data.gatherDuration <= 0 then
+    if not IsIntegerInRange(data.rawMinAmount, 0, MAX_DB_INT)
+        or not IsIntegerInRange(data.rawMaxAmount, data.rawMinAmount, MAX_DB_INT)
+        or not IsIntegerInRange(data.gatherDuration, 1, MAX_DB_INT) then
         return false
     end
     return IsValidSellPrices(data.sellPrices)
@@ -110,13 +134,10 @@ local function IsValidRecipeData(data)
     if type(data) ~= 'table' then
         return false
     end
-    if not IsNonEmptyString(data.label) or not IsNonEmptyString(data.outputItem) then
+    if not IsNonEmptyString(data.label, 100) or not IsNonEmptyString(data.outputItem, 50) then
         return false
     end
-    if type(data.outputAmount) ~= 'number' or type(data.duration) ~= 'number' then
-        return false
-    end
-    if data.outputAmount <= 0 or data.duration <= 0 then
+    if not IsIntegerInRange(data.outputAmount, 1, MAX_DB_INT) or not IsIntegerInRange(data.duration, 1, MAX_DB_INT) then
         return false
     end
     if type(data.inputs) ~= 'table' or #data.inputs == 0 then
@@ -124,13 +145,28 @@ local function IsValidRecipeData(data)
     end
     for _, input in ipairs(data.inputs) do
         if type(input) ~= 'table'
-            or not IsNonEmptyString(input.item)
-            or type(input.amount) ~= 'number'
-            or input.amount <= 0 then
+            or not IsNonEmptyString(input.item, 50)
+            or not IsIntegerInRange(input.amount, 1, MAX_DB_INT) then
             return false
         end
     end
     return true
+end
+
+local function SanitizeRecipeInputs(inputs)
+    local sanitized = {}
+    for _, input in ipairs(inputs) do
+        sanitized[#sanitized + 1] = { item = input.item, amount = input.amount }
+    end
+    return sanitized
+end
+
+local function SanitizeSellPrices(sellPrices)
+    local sanitized = {}
+    for _, entry in ipairs(sellPrices or {}) do
+        sanitized[#sanitized + 1] = { item = entry.item, minPrice = entry.minPrice, maxPrice = entry.maxPrice }
+    end
+    return sanitized
 end
 
 local function IsValidMarkerColor(color)
@@ -141,7 +177,7 @@ local function IsValidMarkerColor(color)
         return false
     end
     for _, channel in ipairs({ 'r', 'g', 'b', 'a' }) do
-        if color[channel] ~= nil and type(color[channel]) ~= 'number' then
+        if color[channel] ~= nil and not IsIntegerInRange(color[channel], 0, 255) then
             return false
         end
     end
@@ -157,26 +193,34 @@ local function IsValidPointData(data)
     end
 
     local coords = data.coords
-    if type(coords.x) ~= 'number' or type(coords.y) ~= 'number' or type(coords.z) ~= 'number' then
+    if not IsNumberInRange(coords.x, -MAX_COORD, MAX_COORD)
+        or not IsNumberInRange(coords.y, -MAX_COORD, MAX_COORD)
+        or not IsNumberInRange(coords.z, -MAX_COORD, MAX_COORD) then
         return false
     end
-    if coords.heading ~= nil and type(coords.heading) ~= 'number' then
+    if coords.heading ~= nil and not IsNumberInRange(coords.heading, -360.0, 360.0) then
         return false
     end
 
-    if data.placementMode == 'npc' and not IsNonEmptyString(data.pedModel) then
+    if data.placementMode == 'npc' and not IsNonEmptyString(data.pedModel, 64) then
         return false
     end
     if data.payoutAccount ~= nil and not VALID_PAYOUT_ACCOUNTS[data.payoutAccount] then
         return false
     end
-    if data.markerType ~= nil and type(data.markerType) ~= 'number' then
+    if data.markerType ~= nil and not IsIntegerInRange(data.markerType, 0, 255) then
         return false
     end
-    if data.markerRadius ~= nil and type(data.markerRadius) ~= 'number' then
+    if data.markerRadius ~= nil and not IsNumberInRange(data.markerRadius, 0.1, 50.0) then
         return false
     end
-    if data.markerHeightOffset ~= nil and type(data.markerHeightOffset) ~= 'number' then
+    if data.markerHeightOffset ~= nil and not IsNumberInRange(data.markerHeightOffset, -100.0, 100.0) then
+        return false
+    end
+    if data.blipSprite ~= nil and not IsIntegerInRange(data.blipSprite, 0, MAX_DB_INT) then
+        return false
+    end
+    if data.blipColor ~= nil and not IsIntegerInRange(data.blipColor, 0, MAX_DB_INT) then
         return false
     end
     return IsValidMarkerColor(data.markerColor)
@@ -293,9 +337,28 @@ local function LoadPoints()
             policeAlert = row.police_alert == 1 or row.police_alert == true,
             blipSprite = row.blip_sprite,
             blipColor = row.blip_color,
-            createdBy = row.created_by,
-            createdAt = row.created_at,
         }
+    end
+end
+
+local function EnsurePointColumns()
+    local rows = SafeQuery(MySQL.query,
+        'SELECT COLUMN_NAME AS name FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?',
+        { 'forge_farming_points' }
+    ) or {}
+
+    local existing = {}
+    for _, row in ipairs(rows) do
+        existing[row.name] = true
+    end
+
+    for _, migration in ipairs(POINT_MIGRATIONS) do
+        if not existing[migration.column] then
+            SafeQuery(MySQL.update,
+                ('ALTER TABLE `forge_farming_points` ADD COLUMN `%s` %s'):format(migration.column, migration.definition),
+                {}
+            )
+        end
     end
 end
 
@@ -308,6 +371,7 @@ AddEventHandler('onResourceStart', function(resourceName)
     FarmPoints = {}
     RecipeProjectIndex = {}
 
+    EnsurePointColumns()
     LoadProjects()
     LoadRecipes()
     LoadPoints()
@@ -317,7 +381,17 @@ end)
 
 RegisterNetEvent('forge_farming:requestSync')
 AddEventHandler('forge_farming:requestSync', function()
-    SyncFarmDataToClient(source)
+    local src = source
+    local now = GetGameTimer()
+    if lastSyncRequest[src] and now - lastSyncRequest[src] < SYNC_COOLDOWN_MS then
+        return
+    end
+    lastSyncRequest[src] = now
+    SyncFarmDataToClient(src)
+end)
+
+AddEventHandler('playerDropped', function()
+    lastSyncRequest[source] = nil
 end)
 
 RegisterNetEvent('forge_farming:creator:createProject')
@@ -335,7 +409,7 @@ AddEventHandler('forge_farming:creator:createProject', function(data)
         return
     end
 
-    local sellPrices = data.sellPrices or {}
+    local sellPrices = SanitizeSellPrices(data.sellPrices)
     local insertId = MySQL.insert.await(
         'INSERT INTO forge_farming_projects (label, raw_item, raw_min_amount, raw_max_amount, gather_duration, sell_prices) VALUES (?, ?, ?, ?, ?, ?)',
         { data.label, data.rawItem, data.rawMinAmount, data.rawMaxAmount, data.gatherDuration, json.encode(sellPrices) }
@@ -373,7 +447,7 @@ AddEventHandler('forge_farming:creator:updateProject', function(projectId, data)
         return
     end
 
-    local sellPrices = data.sellPrices or {}
+    local sellPrices = SanitizeSellPrices(data.sellPrices)
     MySQL.update.await(
         'UPDATE forge_farming_projects SET label = ?, raw_item = ?, raw_min_amount = ?, raw_max_amount = ?, gather_duration = ?, sell_prices = ? WHERE id = ?',
         { data.label, data.rawItem, data.rawMinAmount, data.rawMaxAmount, data.gatherDuration, json.encode(sellPrices), projectId }
@@ -399,6 +473,14 @@ AddEventHandler('forge_farming:creator:deleteProject', function(projectId)
     if not project then
         Framework.Notify(src, Locale('error_invalid_input'), 'error')
         return
+    end
+
+    if RemoveJobsForPoint then
+        for pointId, point in pairs(FarmPoints) do
+            if point.projectId == projectId then
+                RemoveJobsForPoint(pointId)
+            end
+        end
     end
 
     MySQL.update.await('DELETE FROM forge_farming_projects WHERE id = ?', { projectId })
@@ -429,9 +511,10 @@ AddEventHandler('forge_farming:creator:createRecipe', function(projectId, data)
         return
     end
 
+    local inputs = SanitizeRecipeInputs(data.inputs)
     local insertId = MySQL.insert.await(
         'INSERT INTO forge_farming_recipes (project_id, label, inputs, output_item, output_amount, duration) VALUES (?, ?, ?, ?, ?, ?)',
-        { projectId, data.label, json.encode(data.inputs), data.outputItem, data.outputAmount, data.duration }
+        { projectId, data.label, json.encode(inputs), data.outputItem, data.outputAmount, data.duration }
     )
     if not insertId then
         Framework.Notify(src, Locale('error_invalid_input'), 'error')
@@ -441,7 +524,7 @@ AddEventHandler('forge_farming:creator:createRecipe', function(projectId, data)
     project.recipes[insertId] = {
         id = insertId,
         label = data.label,
-        inputs = data.inputs,
+        inputs = inputs,
         outputItem = data.outputItem,
         outputAmount = data.outputAmount,
         duration = data.duration,
@@ -465,13 +548,14 @@ AddEventHandler('forge_farming:creator:updateRecipe', function(recipeId, data)
         return
     end
 
+    local inputs = SanitizeRecipeInputs(data.inputs)
     MySQL.update.await(
         'UPDATE forge_farming_recipes SET label = ?, inputs = ?, output_item = ?, output_amount = ?, duration = ? WHERE id = ?',
-        { data.label, json.encode(data.inputs), data.outputItem, data.outputAmount, data.duration, recipeId }
+        { data.label, json.encode(inputs), data.outputItem, data.outputAmount, data.duration, recipeId }
     )
 
     recipe.label = data.label
-    recipe.inputs = data.inputs
+    recipe.inputs = inputs
     recipe.outputItem = data.outputItem
     recipe.outputAmount = data.outputAmount
     recipe.duration = data.duration
@@ -479,14 +563,6 @@ AddEventHandler('forge_farming:creator:updateRecipe', function(recipeId, data)
     SyncFarmDataToClient()
     Framework.Notify(src, Locale('creator_recipe_updated', data.label), 'success')
 end)
-
-local function GetActiveJobsErrorText()
-    local text = Locale('error_recipe_has_active_jobs')
-    if text == 'error_recipe_has_active_jobs' then
-        return Locale('error_invalid_input')
-    end
-    return text
-end
 
 RegisterNetEvent('forge_farming:creator:deleteRecipe')
 AddEventHandler('forge_farming:creator:deleteRecipe', function(recipeId)
@@ -506,7 +582,7 @@ AddEventHandler('forge_farming:creator:deleteRecipe', function(recipeId)
     )
     local activeJobs = result and result[1] and result[1].cnt or 0
     if activeJobs > 0 then
-        Framework.Notify(src, GetActiveJobsErrorText(), 'error')
+        Framework.Notify(src, Locale('error_recipe_has_active_jobs'), 'error')
         return
     end
 
@@ -566,8 +642,6 @@ AddEventHandler('forge_farming:creator:createPoint', function(projectId, data)
         policeAlert = point.policeAlert,
         blipSprite = point.blipSprite,
         blipColor = point.blipColor,
-        createdBy = identifier,
-        createdAt = os.date('%Y-%m-%d %H:%M:%S'),
     }
 
     SyncFarmDataToClient()

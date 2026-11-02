@@ -6,6 +6,53 @@ Alle relevanten Änderungen an FarmingCreator-X-Hex. Bei jedem Update sind die D
 
 ---
 
+## [1.5.2] – 2026-11-03
+
+### Behoben
+
+- **Dupe beim Abholen**: `collectJob` und `collectFinished` konnten parallel denselben Auftrag auszahlen. Aufträge werden während einer Datenbank-Operation gesperrt; der Status wird vor der Item-Ausgabe gespeichert und bei Fehlschlag zurückgesetzt.
+- **Doppelte Rezept-Inputs**: Gleiche Items in einem Rezept werden zusammengerechnet. Schlägt das Entfernen eines Items fehl, werden bereits entfernte Items zurückgegeben.
+- **Verarbeitung bei Datenbankfehlern**: Ein DB-Fehler beendet nicht mehr den Verarbeitungs-Thread und blockiert keine Aufträge mehr; eingesetzte Items werden zurückgegeben.
+- **Projekt löschen**: Laufende Aufträge an den Punkten des Projekts werden wie beim Löschen eines Punkts entfernt und die Spieler benachrichtigt. Vor dem Löschen erscheint eine Ja/Nein-Abfrage.
+- **Auszahlung**: Schlägt die Gutschrift fehl (z. B. QBCore ohne `black_money`-Konto), erhält der Spieler seine Items zurück.
+- **Boost**: Kommazahl-Multiplikatoren (z. B. 1.5) beenden den Boost-Thread nicht mehr; Zeitfenster über Mitternacht (z. B. 22:00–02:00) funktionieren.
+- **MySQL 8**: Das SQL-Skript nutzt kein MariaDB-only `ADD COLUMN IF NOT EXISTS` mehr. Fehlende Spalten werden beim Start automatisch ergänzt.
+- **Datenschutz**: Der Identifier des erstellenden Admins wird nicht mehr an alle Clients synchronisiert.
+- **Sync-Spam**: `forge_farming:requestSync` ist pro Spieler auf einen Aufruf alle 2 Sekunden begrenzt.
+- **Servervalidierung**: Ganzzahlen, Textlängen, Farbwerte (0–255), Koordinaten und Blip-Werte werden geprüft.
+- **NPC-Ausrichtung**: NPCs schauen beim Platzieren an Ost-/Westwänden nicht mehr in die Wand.
+- **Marker-Vorschau**: Die Vorschau für Verarbeiter-/Verkäufer-Marker hat dieselbe Größe wie der echte Marker.
+- **Ungültige Ped-Modelle**: werden erkannt statt endlos neu gespawnt; beim Platzieren erscheint eine Fehlermeldung.
+- **Verkäufer-Menü**: hängt nicht mehr dauerhaft, wenn der Server nicht antwortet.
+- **Performance**: Sammler- und Verarbeiter-Schleifen laufen ohne Punkte in der Nähe nur noch alle 500 ms.
+- **Verkaufspreis löschen**: entfernt den gewählten Eintrag statt eines Eintrags an derselben Listenposition.
+- **Fehlender Text**: `error_recipe_has_active_jobs` ist lokalisiert.
+
+### Geändert
+
+- `verkäufer.lua` heißt jetzt `verkaeufer.lua` (Client und Server), um Ladeprobleme mit Umlauten in Dateinamen zu vermeiden. **Die alten Dateien `client/modules/verkäufer.lua` und `server/modules/verkäufer.lua` bitte löschen.**
+- Platzhalter in `Config.BoostStartAnnounce` / `Config.BoostEndAnnounce` ist jetzt `%s` statt `%d`.
+- Abgeholte Aufträge werden beim Ressourcenstart aus `forge_farming_jobs` entfernt.
+
+### Zu ersetzende Dateien
+
+| Datei | Grund |
+| --- | --- |
+| `fxmanifest.lua` | umbenannte Verkäufer-Dateien, Versions-Bump auf 1.5.2 |
+| `framework/init.lua` | ESX-Auszahlung prüft das Konto |
+| `client/main.lua` | NPC-Ausrichtung, Vorschau, Löschabfrage, Ped-Prüfung |
+| `client/modules/farming.lua` | Schleifen-Performance |
+| `client/modules/verarbeiter.lua` | Ped-Prüfung, Schleifen-Performance |
+| `client/modules/verkaeufer.lua` | ersetzt `verkäufer.lua`; Timeout, Ped-Prüfung |
+| `server/main.lua` | Validierung, Sync-Limit, Migrationen, Projekt-Löschung |
+| `server/modules/farming.lua` | Boost-Fixes |
+| `server/modules/verarbeiter.lua` | Dupe-Schutz, Inputs, DB-Fehlerbehandlung |
+| `server/modules/verkaeufer.lua` | ersetzt `verkäufer.lua`; Auszahlungs-Rollback |
+| `shared/sv_config.lua` | `%s`-Platzhalter für Boost-Texte |
+| `locals/languages/de.lua` | neue Fehlermeldungen |
+| `sql/forge-Farming.sql` | MySQL-8-kompatibel |
+| `CHANGELOG.md` | Release-Hinweise für 1.5.2 |
+
 ## [1.5.1] – 2026-08-03
 
 ### Behoben

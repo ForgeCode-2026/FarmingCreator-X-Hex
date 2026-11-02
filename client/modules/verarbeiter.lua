@@ -1,4 +1,5 @@
 local spawnedPeds = {}
+local failedSpawns = {}
 local jobStatePromise = nil
 
 RegisterNetEvent('forge_farming:verarbeiter:jobState')
@@ -214,9 +215,14 @@ local function GetNearestVerarbeiterPoint(playerCoords)
 end
 
 local function SpawnPointPed(point)
+    local model = type(point.pedModel) == 'string' and joaat(point.pedModel)
+    if not model or not IsModelInCdimage(model) or not IsModelAPed(model) then
+        failedSpawns[point.id] = true
+        DebugPrint('Invalid ped model for point', point.id, point.pedModel)
+        return
+    end
     spawnedPeds[point.id] = -1
     CreateThread(function()
-        local model = joaat(point.pedModel)
         RequestModel(model)
         local timeout = GetGameTimer() + 10000
         while not HasModelLoaded(model) and GetGameTimer() < timeout do
@@ -245,6 +251,7 @@ end
 
 CreateThread(function()
     while true do
+        local sleep = 500
         local playerCoords = GetEntityCoords(PlayerPedId())
         for _, point in pairs(ClientFarmPoints or {}) do
             if point.type == 'verarbeiter' then
@@ -252,13 +259,14 @@ CreateThread(function()
                 if dist < 30.0 then
                     if point.placementMode == 'marker' then
                         DrawVerarbeiterMarker(point)
-                    elseif point.placementMode == 'npc' and not spawnedPeds[point.id] then
+                        sleep = 0
+                    elseif point.placementMode == 'npc' and not spawnedPeds[point.id] and not failedSpawns[point.id] then
                         SpawnPointPed(point)
                     end
                 end
             end
         end
-        Wait(0)
+        Wait(sleep)
     end
 end)
 

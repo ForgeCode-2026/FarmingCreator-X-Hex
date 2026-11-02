@@ -1,6 +1,7 @@
 ActiveJobs = {}
 
 local TICK_INTERVAL_MS = 30000
+local MAX_TOTAL_DURATION = 2147483647
 
 local function IsPositiveInteger(value)
     return type(value) == 'number' and value > 0 and value == math.floor(value)
@@ -27,8 +28,7 @@ end
 local function CountUncollectedJobs(identifier)
     local count = 0
     for _, job in pairs(ActiveJobs) do
-        if job.playerIdentifier == identifier
-            and (job.status == 'running' or job.status == 'ready') then
+        if job.playerIdentifier == identifier then
             count = count + 1
         end
     end
@@ -44,7 +44,7 @@ function RemoveJobsForPoint(pointId)
         end
     end
 
-    MySQL.update.await('DELETE FROM forge_farming_jobs WHERE point_id = ?', { pointId })
+    SafeQuery(MySQL.update, 'DELETE FROM forge_farming_jobs WHERE point_id = ?', { pointId })
 
     for identifier in pairs(affectedIdentifiers) do
         local target = Framework.GetSourceFromIdentifier(identifier)
@@ -68,31 +68,47 @@ local function GetJobRecipe(job)
     return project and project.recipes[job.recipeId] or nil
 end
 
-local function HasRequiredInputs(src, recipe, amount)
+local function GetRequiredInputs(recipe, amount)
+    local required = {}
     for _, input in ipairs(recipe.inputs) do
-        if Framework.GetItemCount(src, input.item) < input.amount * amount then
+        required[input.item] = (required[input.item] or 0) + input.amount * amount
+    end
+    return required
+end
+
+local function HasRequiredInputs(src, recipe, amount)
+    for item, count in pairs(GetRequiredInputs(recipe, amount)) do
+        if Framework.GetItemCount(src, item) < count then
             return false
         end
     end
     return true
 end
 
-local function RemoveRecipeInputs(src, recipe, amount)
-    for _, input in ipairs(recipe.inputs) do
-        Framework.RemoveItem(src, input.item, input.amount * amount)
+local function RefundRecipeInputs(src, recipe, amount)
+    for item, count in pairs(GetRequiredInputs(recipe, amount)) do
+        Framework.AddItem(src, item, count)
     end
 end
 
-local function RefundRecipeInputs(src, recipe, amount)
-    for _, input in ipairs(recipe.inputs) do
-        Framework.AddItem(src, input.item, input.amount * amount)
+local function RemoveRecipeInputs(src, recipe, amount)
+    local removed = {}
+    for item, count in pairs(GetRequiredInputs(recipe, amount)) do
+        if not Framework.RemoveItem(src, item, count) then
+            for removedItem, removedCount in pairs(removed) do
+                Framework.AddItem(src, removedItem, removedCount)
+            end
+            return false
+        end
+        removed[item] = count
     end
+    return true
 end
 
 local function ComputeMaxCraftable(src, recipe)
     local maxAmount = nil
-    for _, input in ipairs(recipe.inputs) do
-        local possible = math.floor(Framework.GetItemCount(src, input.item) / input.amount)
+    for item, perRun in pairs(GetRequiredInputs(recipe, 1)) do
+        local possible = math.floor(Framework.GetItemCount(src, item) / perRun)
         if not maxAmount or possible < maxAmount then
             maxAmount = possible
         end
@@ -117,7 +133,9 @@ AddEventHandler('onResourceStart', function(resourceName)
 
     ActiveJobs = {}
 
-    local rows = MySQL.query.await(
+    SafeQuery(MySQL.update, "DELETE FROM forge_farming_jobs WHERE status = 'collected'", {})
+
+    local rows = SafeQuery(MySQL.query,
         "SELECT * FROM forge_farming_jobs WHERE status != 'collected'", {}
     ) or {}
 
@@ -179,7 +197,7 @@ local function TickJob(job)
         job.status = 'ready'
     end
 
-    MySQL.update.await(
+    SafeQuery(MySQL.update,
         'UPDATE forge_farming_jobs SET accumulated_ms = ?, status = ? WHERE id = ?',
         { job.accumulatedMs, job.status, job.id }
     )
@@ -200,7 +218,7 @@ CreateThread(function()
 
         for _, id in ipairs(jobIds) do
             local job = ActiveJobs[id]
-            if job and job.status == 'running' then
+            if job and job.status == 'running' and not job.busy then
                 TickJob(job)
             end
         end
@@ -266,6 +284,9 @@ local function ValidateJobStart(src, identifier, pointId, recipeId, amountInput)
     if amount <= 0 or not HasRequiredInputs(src, recipe, amount) then
         return nil, nil, Locale('verarbeiter_not_enough_items')
     end
+    if recipe.duration * amount > MAX_TOTAL_DURATION then
+        return nil, nil, Locale('error_invalid_input')
+    end
     return recipe, amount, nil
 end
 
@@ -285,10 +306,11 @@ local function CreateJob(identifier, pointId, recipeId, amount, totalDuration)
         accumulatedMs = 0,
         status = 'running',
         lastTickAt = os.time(),
+        busy = true,
     }
     ActiveJobs[reservationId] = job
 
-    local insertId = MySQL.insert.await(
+    local insertId = SafeQuery(MySQL.insert,
         "INSERT INTO forge_farming_jobs (player_identifier, point_id, recipe_id, amount, total_duration, accumulated_ms, status) VALUES (?, ?, ?, ?, ?, 0, 'running')",
         { identifier, pointId, recipeId, amount, totalDuration }
     )
@@ -299,6 +321,8 @@ local function CreateJob(identifier, pointId, recipeId, amount, totalDuration)
     end
 
     job.id = insertId
+    job.busy = nil
+    job.lastTickAt = os.time()
     ActiveJobs[insertId] = job
     return job
 end
@@ -315,12 +339,15 @@ AddEventHandler('forge_farming:verarbeiter:startJob', function(pointId, recipeId
         return
     end
 
-    RemoveRecipeInputs(src, recipe, amount)
+    if not RemoveRecipeInputs(src, recipe, amount) then
+        Framework.Notify(src, Locale('verarbeiter_not_enough_items'), 'error')
+        return
+    end
 
     local job = CreateJob(identifier, pointId, recipeId, amount, recipe.duration * amount)
     if not job then
         RefundRecipeInputs(src, recipe, amount)
-        Framework.Notify(src, Locale('error_invalid_input'), 'error')
+        Framework.Notify(src, Locale('error_database'), 'error')
         return
     end
 
@@ -350,7 +377,7 @@ AddEventHandler('forge_farming:verarbeiter:addToJob', function(pointId, amountIn
     end
 
     local job = FindPlayerJobAtPoint(identifier, pointId)
-    if not job or job.status ~= 'running' then
+    if not job or job.status ~= 'running' or job.busy then
         Framework.Notify(src, Locale('error_invalid_input'), 'error')
         return
     end
@@ -367,15 +394,36 @@ AddEventHandler('forge_farming:verarbeiter:addToJob', function(pointId, amountIn
         return
     end
 
-    RemoveRecipeInputs(src, recipe, amount)
+    local addedDuration = recipe.duration * amount
+    if job.totalDuration + addedDuration > MAX_TOTAL_DURATION then
+        Framework.Notify(src, Locale('error_invalid_input'), 'error')
+        return
+    end
 
+    if not RemoveRecipeInputs(src, recipe, amount) then
+        Framework.Notify(src, Locale('verarbeiter_not_enough_items'), 'error')
+        return
+    end
+
+    local previousAmount = job.amount
+    local previousDuration = job.totalDuration
     job.amount = job.amount + amount
-    job.totalDuration = job.totalDuration + (recipe.duration * amount)
+    job.totalDuration = job.totalDuration + addedDuration
+    job.busy = true
 
-    MySQL.update.await(
+    local affected = SafeQuery(MySQL.update,
         'UPDATE forge_farming_jobs SET amount = ?, total_duration = ? WHERE id = ?',
         { job.amount, job.totalDuration, job.id }
     )
+    job.busy = nil
+
+    if not affected then
+        job.amount = previousAmount
+        job.totalDuration = previousDuration
+        RefundRecipeInputs(src, recipe, amount)
+        Framework.Notify(src, Locale('error_database'), 'error')
+        return
+    end
 
     SendDiscordWebhook(Config.Webhooks.verarbeiten, 'Verarbeitung erweitert', 3447003, {
         { name = 'Spieler', value = identifier, inline = true },
@@ -393,7 +441,7 @@ AddEventHandler('forge_farming:verarbeiter:collectJob', function(pointId)
     if not identifier then return end
 
     local job = FindPlayerJobAtPoint(identifier, pointId)
-    if not job or job.status ~= 'ready' then
+    if not job or job.status ~= 'ready' or job.busy then
         Framework.Notify(src, Locale('error_invalid_input'), 'error')
         return
     end
@@ -416,22 +464,32 @@ AddEventHandler('forge_farming:verarbeiter:collectJob', function(pointId)
 
     local totalOutput = recipe.outputAmount * job.amount
     if Config.VerarbeiterCanCarryCheck and not Framework.CanCarryItem(src, recipe.outputItem, totalOutput) then
-        Framework.Notify(src, Locale('error_invalid_input'), 'error')
+        Framework.Notify(src, Locale('error_inventory_full'), 'error')
         return
     end
 
     job.status = 'collecting'
+    job.busy = true
 
-    if not Framework.AddItem(src, recipe.outputItem, totalOutput) then
-        job.status = 'ready'
-        Framework.Notify(src, Locale('error_invalid_input'), 'error')
-        return
-    end
-
-    MySQL.update.await(
+    local affected = SafeQuery(MySQL.update,
         "UPDATE forge_farming_jobs SET status = 'collected' WHERE id = ?",
         { job.id }
     )
+    if not affected then
+        job.status = 'ready'
+        job.busy = nil
+        Framework.Notify(src, Locale('error_database'), 'error')
+        return
+    end
+
+    if not Framework.AddItem(src, recipe.outputItem, totalOutput) then
+        SafeQuery(MySQL.update, "UPDATE forge_farming_jobs SET status = 'ready' WHERE id = ?", { job.id })
+        job.status = 'ready'
+        job.busy = nil
+        Framework.Notify(src, Locale('error_inventory_full'), 'error')
+        return
+    end
+
     ActiveJobs[job.id] = nil
 
     SendDiscordWebhook(Config.Webhooks.verarbeiten, 'Auftrag abgeholt', 3066993, {
@@ -443,6 +501,90 @@ AddEventHandler('forge_farming:verarbeiter:collectJob', function(pointId)
     Framework.Notify(src, Locale('verarbeiter_collect_success', totalOutput, recipe.outputItem), 'success')
 end)
 
+local function ResolveCollectRuns(recipe, finishedRuns, amountInput)
+    local collectRuns = finishedRuns
+    if type(amountInput) == 'number' and amountInput > 0 and amountInput == amountInput then
+        collectRuns = math.min(math.floor(amountInput), finishedRuns)
+    end
+
+    local cap = Config.CollectMaxPerAction and Config.CollectMaxPerAction[recipe.outputItem]
+    if not cap and Config.CollectWeaponsSingle
+        and string.match(recipe.outputItem or '', '^[Ww][Ee][Aa][Pp][Oo][Nn]_') then
+        cap = 1
+    end
+    if type(cap) == 'number' and cap > 0 then
+        collectRuns = math.min(collectRuns, cap)
+    end
+    return collectRuns
+end
+
+local function CollectFinishedRuns(src, identifier, job, recipe, amountInput)
+    if job.status == 'running' then
+        TickJob(job)
+    end
+
+    local finishedRuns = CountFinishedRuns(job, recipe, job.accumulatedMs)
+    local collectRuns = finishedRuns > 0 and ResolveCollectRuns(recipe, finishedRuns, amountInput) or 0
+    if collectRuns <= 0 then
+        Framework.Notify(src, Locale('verarbeiter_nothing_ready'), 'error')
+        return
+    end
+
+    local output = recipe.outputAmount * collectRuns
+    if Config.VerarbeiterCanCarryCheck and not Framework.CanCarryItem(src, recipe.outputItem, output) then
+        Framework.Notify(src, Locale('error_inventory_full'), 'error')
+        return
+    end
+
+    local previous = {
+        amount = job.amount,
+        accumulatedMs = job.accumulatedMs,
+        totalDuration = job.totalDuration,
+        status = job.status,
+    }
+
+    local newAmount = job.amount - collectRuns
+    local newAccumulated = math.max(0, job.accumulatedMs - collectRuns * recipe.duration)
+    local newTotal = recipe.duration * newAmount
+    local newStatus = (newAmount <= 0 and 'collected') or ((newAccumulated >= newTotal) and 'ready' or 'running')
+
+    local affected = SafeQuery(MySQL.update,
+        'UPDATE forge_farming_jobs SET amount = ?, total_duration = ?, accumulated_ms = ?, status = ? WHERE id = ?',
+        { math.max(newAmount, 0), newTotal, newAccumulated, newStatus, job.id }
+    )
+    if not affected then
+        Framework.Notify(src, Locale('error_database'), 'error')
+        return
+    end
+
+    if not Framework.AddItem(src, recipe.outputItem, output) then
+        SafeQuery(MySQL.update,
+            'UPDATE forge_farming_jobs SET amount = ?, total_duration = ?, accumulated_ms = ?, status = ? WHERE id = ?',
+            { previous.amount, previous.totalDuration, previous.accumulatedMs, previous.status, job.id }
+        )
+        Framework.Notify(src, Locale('error_inventory_full'), 'error')
+        return
+    end
+
+    job.amount = newAmount
+    job.accumulatedMs = newAccumulated
+    job.totalDuration = newTotal
+    job.lastTickAt = os.time()
+    if newAmount <= 0 then
+        ActiveJobs[job.id] = nil
+    else
+        job.status = newStatus
+    end
+
+    SendDiscordWebhook(Config.Webhooks.verarbeiten, 'Fertige abgeholt', 3066993, {
+        { name = 'Spieler', value = identifier, inline = true },
+        { name = 'Item', value = recipe.outputItem, inline = true },
+        { name = 'Menge', value = tostring(output), inline = true },
+    })
+
+    Framework.Notify(src, Locale('verarbeiter_collect_success', output, recipe.outputItem), 'success')
+end
+
 RegisterNetEvent('forge_farming:verarbeiter:collectFinished')
 AddEventHandler('forge_farming:verarbeiter:collectFinished', function(pointId, amountInput)
     local src = source
@@ -450,7 +592,7 @@ AddEventHandler('forge_farming:verarbeiter:collectFinished', function(pointId, a
     if not identifier then return end
 
     local job = FindPlayerJobAtPoint(identifier, pointId)
-    if not job then
+    if not job or job.busy or job.status == 'collecting' then
         Framework.Notify(src, Locale('error_invalid_input'), 'error')
         return
     end
@@ -471,73 +613,12 @@ AddEventHandler('forge_farming:verarbeiter:collectFinished', function(pointId, a
         return
     end
 
-    if job.status == 'running' then
-        TickJob(job)
+    job.busy = true
+    local ok, err = pcall(CollectFinishedRuns, src, identifier, job, recipe, amountInput)
+    job.busy = nil
+    if not ok then
+        DebugPrint('collectFinished failed:', err)
     end
-
-    local finishedRuns = CountFinishedRuns(job, recipe, job.accumulatedMs)
-    if finishedRuns <= 0 then
-        Framework.Notify(src, Locale('verarbeiter_nothing_ready'), 'error')
-        return
-    end
-
-    local collectRuns
-    if amountInput == 'max' or amountInput == nil then
-        collectRuns = finishedRuns
-    elseif type(amountInput) == 'number' and amountInput > 0 then
-        collectRuns = math.min(math.floor(amountInput), finishedRuns)
-    else
-        collectRuns = finishedRuns
-    end
-
-    local cap = Config.CollectMaxPerAction and Config.CollectMaxPerAction[recipe.outputItem]
-    if not cap and Config.CollectWeaponsSingle
-        and string.match(recipe.outputItem or '', '^[Ww][Ee][Aa][Pp][Oo][Nn]_') then
-        cap = 1
-    end
-    if type(cap) == 'number' and cap > 0 then
-        collectRuns = math.min(collectRuns, cap)
-    end
-
-    if collectRuns <= 0 then
-        Framework.Notify(src, Locale('verarbeiter_nothing_ready'), 'error')
-        return
-    end
-
-    local output = recipe.outputAmount * collectRuns
-    if Config.VerarbeiterCanCarryCheck and not Framework.CanCarryItem(src, recipe.outputItem, output) then
-        Framework.Notify(src, Locale('error_invalid_input'), 'error')
-        return
-    end
-
-    if not Framework.AddItem(src, recipe.outputItem, output) then
-        Framework.Notify(src, Locale('error_invalid_input'), 'error')
-        return
-    end
-
-    job.amount = job.amount - collectRuns
-    job.accumulatedMs = math.max(0, job.accumulatedMs - collectRuns * recipe.duration)
-    job.totalDuration = recipe.duration * job.amount
-    job.lastTickAt = os.time()
-
-    if job.amount <= 0 then
-        MySQL.update.await("UPDATE forge_farming_jobs SET status = 'collected' WHERE id = ?", { job.id })
-        ActiveJobs[job.id] = nil
-    else
-        job.status = (job.accumulatedMs >= job.totalDuration) and 'ready' or 'running'
-        MySQL.update.await(
-            'UPDATE forge_farming_jobs SET amount = ?, total_duration = ?, accumulated_ms = ?, status = ? WHERE id = ?',
-            { job.amount, job.totalDuration, job.accumulatedMs, job.status, job.id }
-        )
-    end
-
-    SendDiscordWebhook(Config.Webhooks.verarbeiten, 'Fertige abgeholt', 3066993, {
-        { name = 'Spieler', value = identifier, inline = true },
-        { name = 'Item', value = recipe.outputItem, inline = true },
-        { name = 'Menge', value = tostring(output), inline = true },
-    })
-
-    Framework.Notify(src, Locale('verarbeiter_collect_success', output, recipe.outputItem), 'success')
 end)
 
 AddEventHandler('forge_farming:playerLoaded', function(src)

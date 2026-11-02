@@ -23,8 +23,8 @@ Config.CollectMaxPerAction = {
 
 Config.CollectWeaponsSingle = true
 
-Config.BoostStartAnnounce = 'Farming-Boost aktiv: %dx Ausbeute an allen Sammel-Punkten!'
-Config.BoostEndAnnounce = 'Der %dx Farming-Boost ist vorbei.'
+Config.BoostStartAnnounce = 'Farming-Boost aktiv: %sx Ausbeute an allen Sammel-Punkten!'
+Config.BoostEndAnnounce = 'Der %sx Farming-Boost ist vorbei.'
 
 Config.PoliceAlert = {
     chance = 100,

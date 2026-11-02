@@ -12,7 +12,11 @@ local function IsPositiveInteger(value)
 end
 
 local function IsPlayerNearPoint(src, point)
-    local playerCoords = GetEntityCoords(GetPlayerPed(src))
+    local ped = GetPlayerPed(src)
+    if not ped or ped == 0 then
+        return false
+    end
+    local playerCoords = GetEntityCoords(ped)
     local pointCoords = vector3(point.coords.x, point.coords.y, point.coords.z)
     return #(playerCoords - pointCoords) <= Config.InteractionDistance
 end
@@ -88,7 +92,11 @@ AddEventHandler('forge_farming:verkaeufer:sell', function(pointId, item, amount)
 
     local pricePerUnit = math.random(math.floor(minPrice), math.floor(maxPrice))
     local totalPrice = pricePerUnit * amount
-    Framework.AddMoney(src, totalPrice, point.payoutAccount or Config.DefaultPayoutAccount)
+    if not Framework.AddMoney(src, totalPrice, point.payoutAccount or Config.DefaultPayoutAccount) then
+        Framework.AddItem(src, item, amount)
+        Framework.Notify(src, Locale('error_payout_failed'), 'error')
+        return
+    end
 
     SendDiscordWebhook(Config.Webhooks.verkaufen, 'Verkauf', 15844367, {
         { name = 'Spieler', value = Framework.GetIdentifier(src) or 'unbekannt', inline = true },

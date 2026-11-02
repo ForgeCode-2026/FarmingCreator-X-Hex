@@ -95,9 +95,10 @@ if IsDuplicityVersion() then
         if Config.Framework == 'esx' then
             if account == 'cash' then
                 player.addMoney(amount)
-            else
-                player.addAccountMoney(account, amount)
+                return true
             end
+            if not player.getAccount(account) then return false end
+            player.addAccountMoney(account, amount)
             return true
         end
 
